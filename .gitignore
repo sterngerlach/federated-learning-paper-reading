@@ -254,5 +254,6 @@ TSWLatexianTemp*
 # standalone packages
 *.sta
 
-# papers
+# unnecessary directories
 papers/
+federated-learning-content-suggestion-animation/
