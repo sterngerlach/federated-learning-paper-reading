@@ -647,8 +647,8 @@
 		\newline
 		\item FL Serverは、FL Populationに対応したFL Taskがあれば、FL Planを返す
 		\newline
-		\item FL Taskがない、あるいはデバイスが選択されない場合は、FL Serverは、再接続すべき時間を返す \\
-		$\Rightarrow$ このとき、FL Runtimeは終了する \\
+		\item FL Taskがない、あるいはデバイスが選択されない場合は、FL Serverは、再接続すべき時間(何分後に再接続すべきか)を返す \\
+		$\Rightarrow$ FL Runtimeは終了する \\
 		$\Rightarrow$ 指定された時間後に、スケジューラによってFL Runtimeが再度起動される
 	\end{enumerate}
 	
@@ -1172,8 +1172,7 @@
 		\item 設計者が用意した複数のモデルと、設定内容から、FL Planは自動生成される
 		\newline
 		
-		\item FL Planは2つの部分(FL Server用とデバイス用)に分けられる \\
-		$\Rightarrow$ Federated Learning用のライブラリでは自動的に分割される
+		\item FL Planは2つの部分(FL Server用とデバイス用)に分けられる
 		\newline
 		
 		\item デバイス用の部分には次のような情報が格納される \\
@@ -1268,7 +1267,7 @@
 
 \begin{figure}
 	\centering
-	% \animategraphics[loop,controls,width=0.75\linewidth]{20}{./federated-learning-content-suggestion-animation/federated-learning-content-suggestion-}{0}{367}
+	\animategraphics[loop,controls,width=0.75\linewidth]{20}{./federated-learning-content-suggestion-animation/federated-learning-content-suggestion-}{0}{367}
 	\caption{キーボードアプリでのサジェスト機能~\cite{mcmahan_ramage_2017}}
 	\label{fig:federated-learning-content-suggestion}
 \end{figure}
@@ -1302,15 +1301,15 @@
 \begin{itemize}
 	\item データの不正確さ
 	\begin{itemize}
-		\item Federated Learningを用いたアプリケーションの数が少ない
+		\item Federated Learningを用いたアプリケーションは、まだ少ない
 		\item 動作状況を調べるための統計データは、実際に動作するアプリケーションから得たものである \\
-		$\Leftarrow$ 精密な統計データを得るための環境は、用意されなかった
+		$\Leftarrow$ 精密な統計データを得るために、特別な環境を整えることはしていない
 	\end{itemize} \
 	
 	\item スケーラビリティ
 	\begin{itemize}
 		\item Federated Learningのシステムは、デバイスの台数やFL Populationに応じて、適切にスケールする
-		\item 現在は、幾つかのアプリケーションと、約1,000万台のデバイスで、Federated Learningのシステムが動作している
+		\item 現在は、幾つかのアプリケーションと、それらを利用する約1,000万台のデバイスを対象として、Federated Learningのシステムが動作している
 	\end{itemize}
 \end{itemize}
 
@@ -1361,13 +1360,13 @@
 	\item Roundに参加したデバイスの台数
 	\begin{itemize}
 		\item 各Roundには数百台のデバイスが参加すれば、モデルの学習には十分であった \\
-		$\Leftarrow$ それ以上の台数のデバイスが参加することの利点がなかった(パラメータの収束時間に変化がない)
+		$\Leftarrow$ それ以上の台数のデバイスが参加することの利点がなかった(パラメータの収束時間は改善されない)
 		\newline
 		
 		\item ネットワークの問題、計算時のエラー、計算の中断(ユーザがデバイスを使用したなど)によって、$6\%$から$10\%$のデバイスがRoundから欠落した \\
 		$\Rightarrow$ FL Serverは、デバイスのRoundからの欠落を最初から見越して、実際よりも多めのデバイスをRoundに参加させた \\
-		$\Rightarrow$ 各RoundのSelectionフェーズにおいて、1.3倍の台数のデバイスを選択した \\
-		$\Rightarrow$ 昼の方が、夜に比べて欠落するデバイスの割合が高くなった(昼の時間帯は、ユーザによってデバイスが使用される)
+		$\Rightarrow$ 各RoundのSelectionフェーズにおいて、1.3倍の台数のデバイスを選択した(Federated Averagingのアルゴリズムを参照) \\
+		$\Rightarrow$ 昼の方が、夜に比べて欠落するデバイスの割合が高くなった(昼の時間帯は、ユーザによってデバイスが使用され、アイドル状態ではなくなる)
 	\end{itemize}
 \end{itemize}
 
@@ -1396,7 +1395,8 @@
 		\newline
 		
 		\item デバイスのRoundへの参加時間には上限がある \\
-		$\Leftarrow$ FL Serverは、結果をなかなか返さない(もたついている)デバイスを単に無視する
+		$\Leftarrow$ FL Serverは、結果をなかなか返さない(もたついている)デバイスを単に無視する \\
+		$\Leftarrow$ 各RoundのReportingフェーズの時間は、予め決められている
 	\end{itemize}
 \end{itemize}
 
@@ -1443,15 +1443,15 @@
 \begin{itemize}
 	\item デバイスでの学習状況
 	\begin{itemize}
-		\item $75\%$のクライアントが、モデルを訓練し、サーバにアップロードできている
+		\item $75\%$のクライアントは、モデルを訓練し終えた後、サーバにアップロードできている
 		\newline
 		
-		\item $22\%$のクライアントが、モデルの訓練は成功しているが、結果をサーバからリジェクトされている \\
+		\item $22\%$のクライアントでは、モデルの訓練は成功しているが、結果をサーバからリジェクトされている \\
 		$\Leftarrow$ 結果のアップロードまでに時間が掛かり、サーバから単に無視されている
 		\newline
 		
 		\item $2\%$のクライアントが、モデルの訓練の途中で強制終了している \\
-		$\Leftarrow$ モデルの訓練途中に、ユーザがデバイスを使用し始めたことなどが原因
+		$\Leftarrow$ モデルの訓練途中に、ユーザがデバイスを使用し始め、アイドル状態ではなくなったことなどが原因
 	\end{itemize}
 \end{itemize}
 
@@ -1514,6 +1514,7 @@
 		
 		\item パラメータサーバはFederated Learningには取り込めない \\
 		$\Rightarrow$ パラメータサーバでは、モデルのパラメータに各ワーカーがアクセスし、非同期に更新していく \\
+		$\Rightarrow$ デバイス上での学習というより、パラメータ数が$10^9$から$10^{12}$程度の、巨大なモデルを学習させるための、サーバのアーキテクチャに焦点が当てられている \newline \newline
 		$\Leftrightarrow$ Federated Learningでは、FL Serverが、Roundに参加するデバイスを選択する手続きがある(パラメータを同期的に更新するため)
 	\end{itemize}
 	
@@ -1530,7 +1531,7 @@
 		$\Rightarrow$ 各デバイスがデータを保持しており、完全に独立して動くActorである \\
 		$\Rightarrow$ FL Serverは、適切な(eligible)デバイスを選択するほか、選択されたデバイスの一部から送信されてきた結果を集約する(選択されたデバイスの全てが結果を送信するわけではない) \newline \newline
 		$\Rightarrow$ FL Serverは、多くのデバイスが計算を中断すること、デバイスの可用性が極端に変動することを考慮して動作 \newline \newline
-		$\Rightarrow$ MapReduceではなく、これらの独特の環境に合致したフレームワークを採用すべき
+		$\Rightarrow$ MapReduceではなく、これらの特殊な環境に合わせたフレームワークを採用すべき
 	\end{itemize}
 \end{enumerate}
 
@@ -1588,7 +1589,7 @@
 	\begin{itemize}
 		\item デバイス上では、複数のFL Taskを同時に扱うことが可能(1つのFL Taskのみが実行される) \\
 		$\Rightarrow$ FL Taskの実行順に関しては特に考慮されていない(キューに入った順番で決定) \\
-		$\Rightarrow$ ユーザが、どのアプリケーションを頻繁に使用するかなどを考慮できる
+		$\Rightarrow$ ユーザが、どのアプリケーションを頻繁に使用するかなどを、考慮する余地がある
 		\newline
 		
 		\item FL Taskが、古いデータを使って何度も学習を実行する、あるいは新しいデータを学習に用いないといった処理も考えられる
@@ -1598,7 +1599,7 @@
 	
 	\item バンド幅
 	\begin{itemize}
-		\item モデルがRNNであれば、学習データに対して、パラメータの容量が大きくなるかもしれない \\
+		\item モデルがRNNであれば、学習データと比較して、パラメータの容量が大きくなるかもしれない \\
 		$\Rightarrow$ 単に学習データをサーバにアップロードして、学習を進めた方が、通信量の観点では有利かもしれない \\
 		$\Rightarrow$ これはユーザのプライバシーの確保とのトレードオフである
 		\newline
@@ -1616,7 +1617,7 @@
 		\newline
 		
 		\item 特定の機械学習の手法に特化したものではない \\
-		$\Leftarrow$ FL Plan、モデル、差分データといった抽象化された用語で表現したに過ぎない
+		$\Leftarrow$ FL Plan、モデル、差分データといった抽象的な用語で表現
 		\newline
 		
 		\item Federated Learningの概念を、Federated Computationに拡張できる \\
@@ -1625,7 +1626,7 @@
 		
 		\item Federated Analyticsを検討している \\
 		$\Rightarrow$ デバイス固有の統計情報をクラウドにアップロードすることなく、それらを集約したデータのみをアップロードする \\
-		$\Rightarrow$ プライバシーを保護しつつ、開発者は(集約された)デバイスの統計情報を得られる
+		$\Rightarrow$ プライバシーを保護しつつ、開発者は(集約された)デバイスの統計情報を見ることができる
 	\end{itemize}
 \end{enumerate}
 
