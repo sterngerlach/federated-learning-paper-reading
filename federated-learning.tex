@@ -145,6 +145,16 @@
 
 \begin{frame}{同期型の訓練アルゴリズム}
 
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=0.65, clip, trim=1.8cm 13cm 11cm 4cm, page=15]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\label{fig:fl-averaging-algorithm}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{同期型の訓練アルゴリズム}
+
 \begin{itemize}
 	\item \alert{同期型}の訓練アルゴリズムが採用された
 	\begin{enumerate}
@@ -1309,7 +1319,7 @@
 \begin{frame}{実際の動作状況}
 
 \begin{itemize}
-	\item 実際の動作状況
+	\item 接続されたデバイスの台数
 	\begin{itemize}
 		\item デバイスは適切なときに起動されるほか、接続頻度もFL Populationに応じて調節される \\
 		$\Rightarrow$ FL Serverに同時に接続しているデバイスは、1万台程度
@@ -1327,6 +1337,17 @@
 
 \begin{figure}
 	\centering
+	\includegraphics[keepaspectratio, scale=1.2, clip, trim=1.9cm 17.2cm 11cm 7.6cm, page=13]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\caption{接続されたデバイスの台数~\cite{DBLP:journals/corr/abs-1902-01046}}
+	\label{fig:connected-devices}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{figure}
+	\centering
 	\includegraphics[keepaspectratio, scale=1.2, clip, trim=1.9cm 14.5cm 11cm 9.8cm, page=9]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
 	\caption{1時間あたりのRoundの実行回数~\cite{DBLP:journals/corr/abs-1902-01046}}
 	\label{fig:round-completion-rate}
@@ -1337,7 +1358,7 @@
 \begin{frame}{実際の動作状況}
 
 \begin{itemize}
-	\item 実際の動作状況
+	\item Roundに参加したデバイスの台数
 	\begin{itemize}
 		\item 各Roundには数百台のデバイスが参加すれば、モデルの学習には十分であった \\
 		$\Leftarrow$ それ以上の台数のデバイスが参加することの利点がなかった(パラメータの収束時間に変化がない)
@@ -1345,9 +1366,104 @@
 		
 		\item ネットワークの問題、計算時のエラー、計算の中断(ユーザがデバイスを使用したなど)によって、$6\%$から$10\%$のデバイスがRoundから欠落した \\
 		$\Rightarrow$ FL Serverは、デバイスのRoundからの欠落を最初から見越して、実際よりも多めのデバイスをRoundに参加させた \\
-		$\Rightarrow$ 各RoundのSelectionフェーズにおいて、1.3倍の台数のデバイスを選択した
+		$\Rightarrow$ 各RoundのSelectionフェーズにおいて、1.3倍の台数のデバイスを選択した \\
+		$\Rightarrow$ 昼の方が、夜に比べて欠落するデバイスの割合が高くなった(昼の時間帯は、ユーザによってデバイスが使用される)
 	\end{itemize}
 \end{itemize}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=1.2, clip, trim=10.5cm 21.5cm 2cm 2.2cm, page=13]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\caption{各Roundに参加したデバイスの台数の平均~\cite{DBLP:journals/corr/abs-1902-01046}}
+	\label{fig:devices-per-round}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{itemize}
+	\item Roundの実行時間とデバイスの参加時間
+	\begin{itemize}
+		\item 殆どのデバイスのRoundへの参加時間は、Roundの実行時間と大体等しい \\
+		$\Leftarrow$ FL Serverは、必要な数より少し多めのデバイスを選択する \\
+		$\Leftarrow$ そして、必要な数のデバイスから計算結果が返されたら、Roundの実行が終了する \\
+		$\Leftarrow$ 従って、殆どのデバイスのRoundへの参加時間は、似たようなものになる
+		\newline
+		
+		\item デバイスのRoundへの参加時間には上限がある \\
+		$\Leftarrow$ FL Serverは、結果をなかなか返さない(もたついている)デバイスを単に無視する
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=0.8, clip, trim=10.5cm 13.2cm 2cm 7.8cm, page=13]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\caption{Roundの実行時間とデバイスの参加時間~\cite{DBLP:journals/corr/abs-1902-01046}}
+	\label{fig:round-execution-time}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{itemize}
+	\item ネットワークのトラフィック
+	\begin{itemize}
+		\item サーバからのダウンロードの方が、サーバへのアップロードよりも多い \\
+		$\Leftarrow$ サーバからダウンロードするのは、FL Planと、現在のモデル(いずれも同程度のサイズ) \\
+		$\Leftarrow$ サーバへアップロードされるのは、モデルに適用する差分データのみ \\
+		$\Leftarrow$ 差分データは、現在のモデルやFL Planに比べて圧縮しやすい
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=1.2, clip, trim=10.5cm 6cm 2cm 18.2cm, page=13]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\caption{ネットワークのトラフィック~\cite{DBLP:journals/corr/abs-1902-01046}}
+	\label{fig:server-network-traffic}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{itemize}
+	\item デバイスでの学習状況
+	\begin{itemize}
+		\item $75\%$のクライアントが、モデルを訓練し、サーバにアップロードできている
+		\newline
+		
+		\item $22\%$のクライアントが、モデルの訓練は成功しているが、結果をサーバからリジェクトされている \\
+		$\Leftarrow$ 結果のアップロードまでに時間が掛かり、サーバから単に無視されている
+		\newline
+		
+		\item $2\%$のクライアントが、モデルの訓練の途中で強制終了している \\
+		$\Leftarrow$ モデルの訓練途中に、ユーザがデバイスを使用し始めたことなどが原因
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{実際の動作状況}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=1.2, clip, trim=1.9cm 21.2cm 11cm 2.2cm, page=14]{papers/Towards-Federated-Learning-at-Scale-1902-01046.pdf}
+	\label{fig:on-device-training-round-sessions}
+\end{figure}
 
 \end{frame}
 
@@ -1421,6 +1537,99 @@
 \end{frame}
 
 \section{今後の研究}
+
+\begin{frame}{今後の課題}
+
+\begin{enumerate}
+	\item バイアスへの対処
+	\begin{itemize}
+		\item Federated Learningでは、全てのデバイスが均等に参加し、学習を行うことが前提 \\
+		$\Rightarrow$ 学習されるモデルが、バイアスを生む可能性がある
+		\newline
+		
+		\item デバイスは、Wi-Fiに接続され、かつ充電されているときにのみFederated Learningに参加 \\
+		$\Rightarrow$ 幾つかの国では、依然としてWi-Fiが普及していない
+		\newline
+		
+		\item 今回のシステムでは、Androidで、メモリを2GB以上搭載した、高性能のデバイスのみ参加 \\
+		$\Rightarrow$ これもバイアスを生む原因となる可能性
+		\newline
+		
+		\item 現在のシステムでもバイアスの発生にはある程度対処 \\
+		$\Rightarrow$ デバイス上での学習を実行後、アプリケーションに応じた複数の指標を使って、リアルタイムでモデルを評価 \\
+		$\Rightarrow$ デバイス上での学習が、モデルの性能に悪影響を与えていないかどうか検出
+		\newline
+		
+		\item 現時点ではバイアスによる影響は生じていない \\
+		$\Leftarrow$ 但し、アプリケーションによって、バイアスがどの程度出現するのかは分からない \\
+		$\Leftarrow$ 様々なアプリケーション上での評価や、バイアスの影響を軽減するようなアルゴリズムの開発が、今後も必要
+	\end{itemize}
+	
+	\framebreak
+	
+	\item パラメータの収束速度
+	\begin{itemize}
+		\item データセンタでの学習と比べて、パラメータの収束が遅い
+		\newline
+		
+		\item 現在のFederated Learningでは、数百のデバイスがRoundに参加して、モデルの学習を実行 \\
+		$\Rightarrow$ 実際には沢山のデバイスが、モデルの学習を実行できる状態にある \\
+		$\Rightarrow$ アルゴリズムの改良によって、より多くのデバイスがRoundに参加できるようにする
+		\newline
+		
+		\item 各RoundのSelectionフェーズやReportingフェーズの時間は、現在は静的に決定される \\
+		$\Rightarrow$ 動的に決定することで、脱落するデバイスの割合や、単位時間あたりのRoundの実行数を改善できる可能性がある \\
+		$\Rightarrow$ オンラインの機械学習アルゴリズムによって、パラメータを学習する方法などが考えられる
+	\end{itemize}
+	
+	\framebreak
+	
+	\item スケジューリングの改善
+	\begin{itemize}
+		\item デバイス上では、複数のFL Taskを同時に扱うことが可能(1つのFL Taskのみが実行される) \\
+		$\Rightarrow$ FL Taskの実行順に関しては特に考慮されていない(キューに入った順番で決定) \\
+		$\Rightarrow$ ユーザが、どのアプリケーションを頻繁に使用するかなどを考慮できる
+		\newline
+		
+		\item FL Taskが、古いデータを使って何度も学習を実行する、あるいは新しいデータを学習に用いないといった処理も考えられる
+	\end{itemize}
+	
+	\framebreak
+	
+	\item バンド幅
+	\begin{itemize}
+		\item モデルがRNNであれば、学習データに対して、パラメータの容量が大きくなるかもしれない \\
+		$\Rightarrow$ 単に学習データをサーバにアップロードして、学習を進めた方が、通信量の観点では有利かもしれない \\
+		$\Rightarrow$ これはユーザのプライバシーの確保とのトレードオフである
+		\newline
+		
+		\item サーバとデバイス間の通信量を削減するための手法が考えられる \\
+		$\Rightarrow$ モデルの圧縮、パラメータの量子化などが挙げられる \\
+		$\Rightarrow$ 通信量の削減と、モデルによる推論の効率化を同時に達成可能
+	\end{itemize}
+	
+	\framebreak
+	
+	\item Federated Learningの一般化(Federated Computation)
+	\begin{itemize}
+		\item ここで紹介したシステムを応用できるアプリケーションは、まだまだある
+		\newline
+		
+		\item 特定の機械学習の手法に特化したものではない \\
+		$\Leftarrow$ FL Plan、モデル、差分データといった抽象化された用語で表現したに過ぎない
+		\newline
+		
+		\item Federated Learningの概念を、Federated Computationに拡張できる \\
+		$\Rightarrow$ TensorFlowを用いた機械学習に限らず、MapReduceのようなアプリケーションにも適用
+		\newline
+		
+		\item Federated Analyticsを検討している \\
+		$\Rightarrow$ デバイス固有の統計情報をクラウドにアップロードすることなく、それらを集約したデータのみをアップロードする \\
+		$\Rightarrow$ プライバシーを保護しつつ、開発者は(集約された)デバイスの統計情報を得られる
+	\end{itemize}
+\end{enumerate}
+
+\end{frame}
 
 \begin{frame}{参考文献}
 
