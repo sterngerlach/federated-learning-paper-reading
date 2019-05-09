@@ -1,0 +1,654 @@
+
+% federated-optimization.tex
+
+\documentclass[dvipdfmx,notheorems,t]{beamer}
+
+\usepackage{docmute}
+\input{settings}
+
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{algorithmic}
+
+\SetKwInOut{Parameter}{parameters}
+
+\newcommand\AlgoCommentFont[1]{\ttfamily\textcolor{blue}{#1}}
+\SetCommentSty{AlgoCommentFont}
+
+\title[論文輪講: Federated Optimization]{論文輪講 \\ Federated Optimization: \\ Distributed Machine Learning for On-Device Intelligence}
+\author{杉浦 圭祐}
+\institute[松谷研究室]{慶應義塾大学理工学部情報工学科 松谷研究室}
+\date{\today}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\section{}
+
+\begin{frame}[t,allowdisplaybreaks,allowframebreaks]{目次}
+\tableofcontents
+\end{frame}
+
+\section{問題設定}
+
+\begin{frame}{問題の定式化}
+
+\begin{itemize}
+	\item 問題の定式化
+	\begin{itemize}
+		\item 解くべき問題は次のように定式化される
+		\begin{equation}
+			\min_{\bm{w} \in \mathbb{R}^D} f(\bm{w}), \qquad f(\bm{w}) = \frac{1}{N} \sum_{i = 1}^N f_i(\bm{w})
+		\end{equation}
+	
+		\item 入出力のデータを$\left\{ \bm{x}_i, y_i \right\}_{i = 1}^N$、損失関数を$f_i(\bm{w})$とする
+		\item 具体的には、以下のような問題が考えられる
+		\begin{eqnarray}
+			&& \text{線形回帰}: \nonumber \\
+			&& \qquad f_i(\bm{w}) = \frac{1}{2} \left( \bm{x}_i^T \bm{w} - y_i \right)^2, \ y_i \in \mathbb{R} \\
+			&& \text{ロジスティック回帰}: \nonumber \\
+			&& \qquad f_i(\bm{w}) = - \log \left( 1 + \exp \left( - y_i \bm{x}_i^T \bm{w} \right) \right), \ y_i \in \left\{ -1, 1 \right\} \\
+			&& \text{サポートベクタマシン}: \nonumber \\
+			&& \qquad f_i(\bm{w}) = \max \left\{ 0, 1 - y_i \bm{x}_i^T \bm{w} \right\}, \ y_i \in \left\{ -1, 1 \right\}
+		\end{eqnarray}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題の定式化}
+
+\begin{itemize}
+	\item 問題の定式化
+	\begin{itemize}
+		\item 上記は凸最適化問題である
+		\newline
+		
+		\item 線形回帰、ロジスティック回帰、サポートベクタマシンより複雑なモデルにも適用可能 \\
+		$\Rightarrow$ 条件付き確率場や、ニューラルネットワーク \\
+		$\Rightarrow$ 損失関数$f_i(\bm{w})$が非凸で、複雑な形状をしている場合
+		\newline
+		
+		\item データ数$N$が大き過ぎて、単一のノードで学習を進めるのは不可能 \\
+		$\Rightarrow$ 分散処理が必要(データが複数の箇所に分散し、複数の相互接続されたノードで学習を行う) \newline \newline
+		$\Rightarrow$ ノード間での通信時間がボトルネックとなる可能性 \\
+		$\Rightarrow$ 並列計算の利点を活かすために、モデルの学習を、単一ノードでの計算に適した簡単な問題に分割する必要がある
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item 最新(State-of-the-art)の最適化手法
+	\begin{itemize}
+		\item シーケンシャルであるため、並列処理には向かない
+		\newline
+		
+		\item 各イテレーションでの処理は非常に高速だが、イテレーションの実行を何度も繰り返す必要がある \\
+		$\Rightarrow$ 各イテレーションの実行後に、複数のノード間で通信を行うと、性能が極端に落ちる \\
+		$\Rightarrow$ 各イテレーションの実行時間より、ノード間の通信時間の方が遥かに大きい
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item 従来手法における仮定
+	\begin{enumerate}
+		\item データは各ノードに均等に分散している
+		\newline
+		
+		\item ノード数$K$に比べて、1つのノードが保持しているデータ数の平均$N / K$の方が非常に大きい($K \ll N / K$) \\
+		$\Rightarrow$ 大規模なデータセンタに、データが格納されている想定
+		\newline
+		
+		\item 各ノードが、分布をよく表現するデータを保持している \\
+		$\Rightarrow$ 各ノードが、\alert{独立同分布}(IID)標本を持っているという前提 \newline \newline
+		$\Rightarrow$ 実際には、ノードの地理的な位置によって、各ノードが持つデータが、クラスタに分かれている可能性 \\
+		$\Rightarrow$ 各ノードが持つデータが時間的に変動し、ある時点では他のノードと似たようなデータを保持している可能性 \\
+		$\Rightarrow$ あるノードに頻繁に現れる特徴が、他のノードでは全く現れない可能性
+	\end{enumerate}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item 従来手法における仮定
+	\begin{itemize}
+		\item 従来手法では、上記3つの仮定が成立する \\
+		$\Rightarrow$ Federated Learningでは、これらの\alert{仮定を全く置かない}
+		\newline
+		
+		\item 従来手法では、最初に、デバイス上のデータを中央のノード(データセンタ等)に集める \\
+		$\Rightarrow$ 集めたデータをランダムにシャッフルし、複数の計算ノードに均等な数だけ配分して、学習させる
+		\newline
+		
+		\item Federated Learningでは、デバイス上のデータを中央のノードに送信しない \\
+		$\Rightarrow$ 各デバイスと中央のノードとの通信量が大幅に削減 \\
+		$\Rightarrow$ ユーザのプライバシーを保護し、セキュリティを向上させる \\
+		$\Rightarrow$ データがデバイス上にしか存在しないので、中央のノードが攻撃されても、ユーザのデータが漏洩する危険性がない(攻撃されそうな箇所の候補が減る)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item Federated Learningでの問題設定
+	\begin{itemize}
+		\item Federated Learningでは、次のような現実的な仮定を置く
+	\end{itemize} \
+	
+	\begin{enumerate}
+		\item \alert{Massively Distributed}: データは、多数のノードに分散 \\
+		$\Rightarrow$ ノード数$K$と、1つのノードが保持しているデータ数の平均$N / K$を比較したとき、\color{red}$N / K \ll K$\normalcolor となる可能性
+		\newline
+		
+		\item \alert{Non-IID}: 各ノードが保持するデータは、異なる分布からサンプルされた可能性 \\
+		$\Rightarrow$ あるノードが保持しているデータは、データ全体の分布を表現しているとは限らない \\
+		$\Rightarrow$ 各ノードが保持するデータは、独立に同一の分布からサンプルされた(IID)とは、仮定し難い
+		\newline
+		
+		\item \alert{Unbalanced}: ノードによって、保持しているデータ数は大きく異なる
+	\end{enumerate}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item Federated Learningでの問題設定
+	\begin{itemize}
+		\item 上記に加えて、この論文では次のような仮定を置く
+	\end{itemize} \
+		
+	\begin{enumerate}
+		\item データは\alert{スパース}である \\
+		$\Rightarrow$ ある特徴は、ほんの僅かなノードやデータにしか現れない
+		\newline
+		
+		\item データはモバイル端末上に存在し、プライバシー上の配慮が必要(\alert{Privacy Sensitive}) \\
+		$\Rightarrow$ 入出力データ$\left\{ \bm{x}_i, y_i \right\}$はデバイス上で作られる \\
+		$\Rightarrow$ 例えば、ユーザが次に入力する単語の予測、ユーザがシェアしそうな写真の予測、ユーザにとってどの通知が重要かの予測
+		\newline
+		
+		\item 多数のデバイスが動作するので、事実上無限の計算能力が得られる \\
+		$\Rightarrow$ 但し、各デバイスと中央のノード間の、通信コストによって制限される(バンド幅の制限) \\
+		$\Rightarrow$ デバイスと中央のノード間の通信を、いかに減らせるかが、性能向上のための鍵となる
+		\newline
+		
+		\item 差分データ$\bm{\delta} \in \mathbb{R}^D$が、モデルの学習に使用する\alert{唯一の情報}である \\
+		$\Rightarrow$ 各デバイスは、1回のRoundにつき、モデルのパラメータの差分$\bm{\delta} \in \mathbb{R}^D$を計算($D$は、モデルのパラメータの次元) \\
+		$\Rightarrow$ 差分$\bm{\delta}$が、デバイスから中央のノードにアップロードされる
+	\end{enumerate}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item Federated Learningで送信される差分データ$\bm{\delta}$について
+	\begin{itemize}
+		\item $\bm{\delta}$は、ユーザのプライベートな情報を依然として含むかもしれないが、訓練データ$\left\{ \bm{x}_i, y_i \right\}$に比べれば無視できるほど小さい
+		\newline
+		
+		\item モデルのパラメータの差分ベクトル$\bm{\delta}$のサイズは、訓練データのサイズには関係ない \\
+		$\Rightarrow$ 訓練データが巨大(例えばユーザが撮影した動画)であっても、データそのものではなく、差分データのみを中央のノードに送信すればよいため、\alert{通信量が大幅に削減}できる
+		
+		\framebreak
+		
+		\item 差分ベクトル$\bm{\delta}$の使途は、元の訓練データ$\left\{ \bm{x}_i, y_i \right\}$に比べて限られる \\
+		$\Rightarrow$ モデルの訓練以外に、殆ど使い道がない \\
+		$\Rightarrow$ 各デバイスから送信された差分データは、モデルの訓練に使用した後は、破棄してよい \newline \newline
+		$\Rightarrow$ ユーザにとっては、アップロードしたデータが、モデルの訓練にしか使われない(想定外の方法で使われない)ことが分かっているので、安心できる(\alert{プライバシーの保護}につながる) \newline \newline
+		$\Rightarrow$ モデルを訓練する側にとっては、ユーザのデータを保存する際の負担が軽減される \\
+		$\Rightarrow$ 訓練データであれば、漏洩しないように厳重に管理する必要がある \\
+		$\Leftrightarrow$ 差分データであれば、万が一不正にアクセスされても、ユーザの個人情報が漏洩することはない
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{問題設定}
+
+\begin{itemize}
+	\item 論文で提案された訓練アルゴリズムについて
+	\begin{itemize}
+		\item Federated Learningのための訓練アルゴリズムを新たに設計した \\
+		$\Leftarrow$ \alert{Massively Distributed}、\alert{Non-IID}、\alert{Unbalanced}
+		\newline
+		
+		\item 新たな訓練アルゴリズムによって、比較的少ないRound数(通信量)で、モデルのパラメータを収束させることができた
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\section{基本的な最適化アルゴリズム}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item 解くべき問題は、次のように定式化された
+	\begin{itemize}
+		\item $D$はモデルのパラメータの次元数、$N$は訓練データ数
+		\item $\bm{w} \in \mathbb{R}^D$はパラメータベクトル、$f_i(\bm{w})$は損失関数
+		\begin{equation}
+			\min_{\bm{w} \in \mathbb{R}^D} f(\bm{w}), \qquad f(\bm{w}) = \frac{1}{N} \sum_{i = 1}^N f_i(\bm{w})
+		\end{equation}
+	\end{itemize} \
+	
+	\item ベースラインアルゴリズム
+	\begin{itemize}
+		\item 基本的なアルゴリズムとして、以下を紹介する
+		\newline
+		\item \alert{勾配降下法}(GD; Gradient Descent)
+		\item \alert{確率的勾配降下法}(SGD; Stochastic Gradient Descent)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item 勾配降下法(GD; Gradient Descent)
+	\begin{itemize}
+		\item パラメータの更新式は次のようになる
+		\begin{equation}
+			\bm{w}^{t + 1} = \bm{w}^t - h_t \nabla f(\bm{w}^t)
+		\end{equation}
+		
+		\item $\nabla f(\bm{w}^t)$は次のように定義される
+		\begin{eqnarray}
+			\nabla f(\bm{w}^t) &\equiv& \left. \frac{\partial}{\partial \bm{w}} f(\bm{w}) \right|_{\bm{w} = \bm{w}^t} \\
+			&=& \frac{1}{N} \sum_{i = 1}^N \left. \frac{\partial}{\partial \bm{w}} f_i(\bm{w}) \right|_{\bm{w} = \bm{w}^t} \\
+			&=& \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)
+		\end{eqnarray}
+		損失関数$f(\bm{w})$のパラメータ$\bm{w}$による勾配の、$\bm{w} = \bm{w}^t$における値
+		
+		\item $h_t > 0$は学習率(ステップサイズ)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item 勾配降下法(GD; Gradient Descent)の問題点
+	\begin{itemize}		
+		\item 勾配$\nabla f(\bm{w}^t)$を求めるためには、$N$個の各データについての勾配$\nabla f_i(\bm{w}^t)$を計算する必要がある \\
+		$\Rightarrow$ 1回のパラメータ更新のために、全データを処理する必要がある \\
+		$\Rightarrow$ データ数$N$は非常に大きいため、勾配の計算に時間が掛かり過ぎる \newline \newline
+		$\Rightarrow$ 勾配降下法は、遅すぎて使い物にならない
+		\newline
+		
+		\item モメンタム項を加えることで、アルゴリズムを高速化できる \\
+		$\Rightarrow$ 但し、1回のパラメータ更新のために、全データを処理する必要はある \\
+		$\Rightarrow$ モメンタム項を加えても、やはり使い物にならない
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item 確率的勾配降下法(SGD; Stochastic Gradient Descent)
+	\begin{itemize}
+		\item パラメータの更新式は次のようになる
+		\begin{equation}
+			\bm{w}^{t + 1} = \bm{w}^t - h_t \nabla f_{i_t}(\bm{w}^t)
+		\end{equation}
+		
+		\item $\nabla f_{i_t}(\bm{w}^t)$は次のように定義される
+		\begin{eqnarray}
+			\nabla f_{i_t}(\bm{w}^t) = \left. \frac{\partial}{\partial \bm{w}} f_{i_t}(\bm{w}) \right|_{\bm{w} = \bm{w}^t}
+		\end{eqnarray}
+		
+		\item $i_t$は、$1$から$N$の中から適当に選択されたインデックス \\
+		$\Rightarrow$ 時刻$t$では、$i_t$番目のデータ$\left\{ \bm{x}_{i_t}, y_{i_t} \right\}$とパラメータ$\bm{w}^t$を用いて、損失関数$f_{i_t}(\bm{w}^t)$を計算 \\
+		$\Rightarrow$ 損失関数の勾配$\nabla f_{i_t}(\bm{w}^t)$を求めて、パラメータ$\bm{w}$を勾配の方向に更新
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item 確率的勾配降下法(SGD; Stochastic Gradient Descent)
+	\begin{itemize}
+		\item 1回のパラメータ更新のためには、1つのデータ点に対する勾配$\nabla f_{i_t}(\bm{w}^t)$だけを求めればよい \\
+		$\Rightarrow$ 勾配降下法とは異なり、全データを処理する必要がない
+		\newline
+		
+		\item 1つのデータ点に対する勾配の期待値は、損失関数$f(\bm{w})$の勾配の不変推定量となっている \\
+		$\Rightarrow$ $\mathbb{E} \left[ \nabla f_{i_t}(\bm{w}) \right] = \nabla f(\bm{w}^t)$であり、この手法が正当化される \newline \newline
+		$\Rightarrow$ 実際には、データ点のサンプリングによって、(真の勾配に対して)ノイズが加わった勾配が得られるため、パラメータの収束が遅くなる \\
+		$\Rightarrow$ 学習率(ステップサイズ)$h_t$の設定が重要になる
+		\newline
+		
+		\item 勾配の計算に用いるデータ点$i_t$を、毎回ランダムに選ぶのではなく、全データをランダムな順で取り出し、その勾配を求めてパラメータを更新していく手法がある
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{基本的な最適化アルゴリズム}
+
+\begin{itemize}
+	\item GDとSGDとの比較
+	\begin{itemize}
+		\item GDではパラメータの収束が速い $\Leftrightarrow$ SGDは収束が遅い
+		\newline
+		
+		\item GDでは各イテレーションの計算に非常に時間が掛かる \\
+		$\Leftarrow$ 各イテレーションにおいて、全データを処理する必要がある \\
+		$\Leftrightarrow$ SGDでは各イテレーションの計算は高速であり、計算時間はデータ数$N$に依存しない
+		\newline
+		
+		\item 今回解こうとしている問題では、パラメータの精度はそこまで高くなくてもよい \\
+		$\Rightarrow$ SGDで十分である(極端な場合には、全データを1回ずつ処理するだけで、パラメータが収束) \\
+		$\Leftarrow$ GDの場合は、全データを1回ずつ処理して、ようやくパラメータを1回更新できる
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\section{ランダム化された最適化アルゴリズム}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item ランダム化された座標降下法(RCD; Randomized Coordinate Descent)
+	\begin{itemize}
+		\item パラメータの更新式は次のようになる
+		\begin{equation}
+			\bm{w}^{t + 1} = \bm{w}^t - h_{j_t} \nabla_{j_t} f(\bm{w}^t) \bm{e}_{j_t}
+		\end{equation}
+		
+		\item $j_t$は、$1$から$D$(パラメータの次元数)の中から適当に選択された次元
+		\item $h_{j_t}$は学習率(ステップサイズ)、$\bm{e}_{j_t} \in \mathbb{R}^D$は次元$j_t$方向の標準基底ベクトル
+		\item 勾配$\nabla_j f(\bm{w}^t)$は次のように定義される
+		\begin{eqnarray}
+			\nabla_j f(\bm{w}^t) &=& \frac{\partial}{\partial w_j} f(\bm{w}^t) \\
+			&=& \frac{1}{N} \sum_{i = 1}^N \left. \frac{\partial}{\partial w_j} f_i(\bm{w}) \right|_{\bm{w} = \bm{w}^t} \\
+			&=& \frac{1}{N} \sum_{i = 1}^N \nabla_{w_j} f_i(\bm{w}^t)
+		\end{eqnarray}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item ランダム化された座標降下法(RCD; Randomized Coordinate Descent)
+	\begin{itemize}
+		\item 最適化問題$\displaystyle \min_{\bm{w} \in \mathbb{R}^D} f(\bm{w})$を、幾つかの部分問題に分割
+		\newline
+		
+		\item $f(\bm{w})$を、$j \neq j_t$であるような変数については固定したまま、ある1つの変数$j_t \in \left\{ 1, \ldots, D \right\}$について最小化する \\
+		$\Rightarrow$ 一度に1つの座標を最適化するため、\alert{座標降下法}とよばれる \newline \newline
+		$\Rightarrow$ 一般に、変数の部分集合について同時に最小化を行うアルゴリズムを、\alert{ブロック座標降下法}という
+		\newline
+		
+		\item 座標降下法は、ある1つの変数が、他の変数の最適値に影響を与えない場合に効果を発揮 \\
+		$\Rightarrow$ 「深層学習」の8.7.2節を参照
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item SDCA; Stochastic Dual Coordinate Ascent
+	\begin{itemize}
+		\item 正則化項$\psi(\bm{w})$を付加した、以下の最適化問題を考える
+		\begin{equation}
+			\min_{\bm{w} \in \mathbb{R}^D} f(\bm{X} \bm{w}) + \psi(\bm{w}), \qquad f(\bm{w}) = \frac{1}{N} \sum_{i = 1}^N f_i(y_i, \bm{x}_i^T \bm{w})
+		\end{equation}
+		
+		\item 上記の\alert{双対問題}(Dual problem)は、\alert{Fenchel双対定理}から、次のようになる($K$はデータ$\bm{x}$の次元数)~\cite{suzuki_2013}
+		\begin{equation}
+			- \min_{\bm{u} \in \mathbb{R}^N} f^*(\bm{u}) + \psi^* \left( -\frac{\bm{X}^T \bm{u}}{N} \right)
+		\end{equation}
+		
+		\item 但し、$f^*$と$\psi^*$は、それぞれ$f$と$\psi$の\alert{ルジャンドル変換}である
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item SDCA; Stochastic Dual Coordinate Ascent
+	\begin{itemize}
+		\item $f(\bm{x})$の\alert{ルジャンドル変換}$f^*(\bm{y})$とは、関数$f(\bm{x})$の変数を、その微分$\bm{y} = \bm{x}'$に置き換えた関数であり、次のように定義される(関数$f(\bm{x})$を、その傾きの情報から捉えた関数)
+		\begin{equation}
+			f^*(\bm{y}) = \sup_{\bm{x}} \left\{ \bm{x}^T \bm{y} - f(\bm{x}) \right\}
+		\end{equation}
+		
+		\item 双対問題(Dual problem)とは、最適化問題における\alert{主問題}(Primary problem)の\alert{補問題}であり、主問題と双対問題は表裏一体の関係にある
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item SDCA; Stochastic Dual Coordinate Ascent
+	\begin{itemize}		
+		\item 例えば、以下の問題$P$(主問題)を、次のように定める
+		\begin{equation}
+			\min_{\bm{x}} \bm{c}^T \bm{x} \quad \mathrm{s.t.} \quad \bm{A} \bm{x} = \bm{b}, \bm{x} \ge 0
+		\end{equation}
+		
+		\item 一方の問題$D$(双対問題)は、次のようになる
+		\begin{equation}
+			\max_{\bm{y}} \bm{b}^T \bm{y} \quad \mathrm{s.t.} \quad \bm{A}^T \bm{y} \le \bm{c}
+		\end{equation}
+		
+		\item 双対定理より、問題$P$に最適解$\bm{x}^*$が存在すれば、問題$D$にも最適解$\bm{y}^*$が存在して、$\bm{c}^T \bm{x}^* = \bm{b}^T \bm{y}^*$が成立
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{ランダム化された最適化アルゴリズム}
+
+\begin{itemize}
+	\item SDCA; Stochastic Dual Coordinate Ascent
+	\begin{itemize}		
+		\item 今回の場合、問題$P$(主問題)は、(正則化項付きの)\alert{損失関数の最小化}である
+		\item 問題$P$の代わりに双対問題$D$を解くことができる
+		\item このとき、問題$P$の解が得られるので、最適なパラメータが求まる
+		\newline
+		
+		\item SDCAは、このような考え方に基づくアルゴリズムである(詳細は省略)
+		\newline
+		
+		\item 主問題と双対問題を、交互に解くアルゴリズムも考えられる
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item SAG; Stochastic Average Gradient
+	\begin{itemize}
+		\item 確率的勾配の平均を取るアルゴリズム
+		\item SAGは、GD(勾配降下法)とSGD(確率的勾配降下法)の中間に位置
+		\newline
+		
+		\item SAGの各イテレーションでは、$i_t \in \left\{ 1, \ldots, N \right\}$を選択したうえで、次の処理が実行される
+		\begin{eqnarray}
+			\bm{w}^{t + 1} &=& \bm{w}^t - \frac{\alpha_t}{N} \sum_{i = 1}^N \bm{y}_i^t \\
+			&=& \bm{w}^t - \frac{\alpha_t}{N} \left[ \sum_{i = 1}^N \bm{y}_i^{t - 1} + \left( \bm{y}_{i_t}^t - \bm{y}_{i_t}^{t - 1} \right) \right] \\
+			&=& \bm{w}^t - \frac{\alpha_t}{N} \left[ \sum_{i = 1}^N \bm{y}_i^{t - 1} + \left( \nabla f_{i_t}(\bm{w}^t) - \bm{y}_{i_t}^{t - 1} \right) \right]
+		\end{eqnarray}
+		
+		\item 但し、$\bm{y}_i^t$は次のように定義される
+		\begin{equation}
+			\bm{y}_i^t = \left\{ \begin{array}{ll} \nabla f_i(\bm{w}^t) & (i = i_t) \\ \bm{y}_i^{t - 1} & (\text{それ以外のとき}) \end{array} \right.
+		\end{equation}
+		
+		\item 勾配$\nabla f_i(\bm{w}^t)$は次のように定義される
+		\begin{equation}
+			\nabla f_i(\bm{w}^t) \equiv \left. \frac{\partial}{\partial \bm{w}} f_i(\bm{w}) \right|_{\bm{w} = \bm{w}^t}
+		\end{equation}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item SAG; Stochastic Average Gradient
+	\begin{itemize}
+		\item GDでは、現在のパラメータ$\bm{w}^t$を基に、\alert{全てのデータについて}勾配$\nabla f_i(\bm{w}^t)$を計算 \\
+		$\Rightarrow$ その平均$\sum_{i = 1}^N \nabla f_i(\bm{w}^t)$(\alert{Full gradient})を使って、パラメータ$\bm{w}$を更新 \\
+		$\Rightarrow$ 1回のパラメータの更新にはFull gradientが必要であり、全てのデータを使って計算するため、非常に処理が重い
+		\newline
+		
+		\item SGDでは、データ点$i \in \left\{ 1, \ldots, N \right\}$についてのみ(\alert{1つのデータについてのみ})、勾配$\nabla f_i(\bm{w}^t)$を計算 \\
+		$\Rightarrow$ その勾配$\nabla f_i(\bm{w}^t)$を使って、パラメータ$\bm{w}$を更新 \\
+		$\Rightarrow$ 1点における勾配$\nabla f_i(\bm{w}^t)$を用いて、$\sum_{i = 1}^N \nabla f_i(\bm{w}^t)$を近似 \\
+		$\Rightarrow$ 1回のパラメータの更新に必要な、計算量を少なく抑えられる
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item SAG; Stochastic Average Gradient
+	\begin{itemize}		
+		\item SAGでは、全データに対する勾配(Full gradient)を、\alert{少しずつ更新していく} \\
+		$\Rightarrow$ ある1つのデータ点$i_t \in \left\{ 1, \ldots, N \right\}$について、現在のパラメータ$\bm{w}^t$の下で勾配$\nabla f_{i_t}(\bm{w}^t)$を計算 \\
+		$\Rightarrow$ 新しく求めた勾配$\nabla f_{i_t}(\bm{w}^t)$を使って、以下の式でFull gradientを更新 \\
+		\begin{equation}
+			\sum_{i = 1}^N \bm{y}_i^t = \sum_{j \neq i_t} \bm{y}_j^{t - 1} + \nabla f_{i_t}(\bm{w}^t)
+		\end{equation}
+		$\Rightarrow$ 更新されたFull gradientを使って、パラメータ$\bm{w}$を更新
+		\newline
+		
+		\item SAGでは、計算される勾配にはバイアスが含まれる \\
+		$\Rightarrow$ 後述の\alert{SAGA}で計算される勾配の期待値は、勾配$f(\bm{w})$の不変推定量に一致
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item SAG; Stochastic Average Gradient
+	\begin{itemize}		
+		\item SAGでは、各データにおける勾配の履歴(現在のFull gradient)、従って$\left\{ \bm{y}_i^t \right\}_{i = 1}^N$を記憶しなければならないことが分かる
+		\newline
+		
+		\item 比較的小規模のニューラルネットの学習であっても、勾配を記憶するためのメモリ使用量が大きいため、アルゴリズムは使い物にならなくなる
+		\newline
+		
+		\item GDの速い収束と、SGDの速い計算時間という、双方の利点を受け継いだアルゴリズム
+		\newline
+		
+		\item SAGの改良版として、SAGAアルゴリズムが存在(詳細は省略)
+		\item 因みに、SAGAが何の略称なのかは不明
+		\newline
+		
+		\item SAGAにおけるパラメータの更新式は次のようになる~\cite{stochastic_2017}
+		\begin{eqnarray}
+			\bm{w}^{t + 1} &=& \bm{w}^t - \alpha_t \left[ \frac{1}{N} \sum_{i = 1}^N \bm{y}_i^{t - 1} + \left( \bm{y}_{i_t}^t - \bm{y}_{i_t}^{t - 1} \right) \right] \\
+			&=& \bm{w}^t - \alpha_t \left[ \frac{1}{N} \sum_{i = 1}^N \bm{y}_i^{t - 1} + \left( \nabla f_{i_t}(\bm{w}^t) - \bm{y}_{i_t}^{t - 1} \right) \right]
+		\end{eqnarray}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item SVRG; Stochastic Variance Reduced Gradient
+	\begin{itemize}
+		\item 二重ループの最適化アルゴリズムである
+		\item 外側のループでは、全データ点についての完全な勾配$\nabla f(\bm{w}^t)$を計算
+		\begin{equation}
+			\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \left. \frac{\partial}{\partial \bm{w}} f_i(\bm{w}) \right|_{\bm{w} = \bm{w}^t}
+		\end{equation}
+		
+		\item 内側のループでは、インデックス$i \in \left\{ 1, \ldots, N \right\}$を選択し、次の式を用いてパラメータを更新していく
+		\begin{equation}
+			\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]
+		\end{equation}
+		
+		\item 確率的勾配$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$は、$\bm{w}$と$\bm{w}^t$における勾配の変化$\nabla f(\bm{w}) - \nabla f(\bm{w}^t)$を\alert{推定するための項}
+		\newline
+		
+		\item SVRGが完全な勾配$\nabla f(\bm{w}^t)$を計算している間、パラメータは一度も更新されないが、同じ時間で、SGDではパラメータが$N$回更新される \\
+		$\Rightarrow$ 最初は、SGDの方が学習が進むことが予測される
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{SVRG; Stochastic Variance Reduced Gradient~\cite{stochastic_2017}}
+	\label{alg:svrg}
+	\Parameter{$m = $ number of stochastic steps per epoch, $h = $ stepsize (learning rate)}
+	\begin{algorithmic}[1]
+		\FOR{$s = 0, 1, \ldots$}
+			\STATE{Compute and store full gradient $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$} \tcp*{Full pass through data}
+			\STATE{Set $\bm{w} = \bm{w}^t$}
+			\FOR{$t = 1$ \TO $m$}
+				\STATE{Pick $i \in \left\{ 1, \ldots, N \right\}$, uniformly at random}
+				\STATE{$\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$} \tcp*{Stochastic update}
+			\ENDFOR
+			\STATE{$\bm{w}^{t + 1} = \bm{w}$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\section{Federated Learningのための最適化アルゴリズム}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{参考文献}
+
+\bibliographystyle{plain}
+\bibliography{federated-optimization-bibliography}
+
+\end{frame}
+
+\end{document}
