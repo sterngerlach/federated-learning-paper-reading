@@ -6,6 +6,8 @@
 \usepackage{docmute}
 \input{settings}
 
+\usepackage{ulem}
+
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{algorithmic}
 
@@ -335,7 +337,7 @@
 		$\Rightarrow$ 勾配降下法とは異なり、全データを処理する必要がない
 		\newline
 		
-		\item 1つのデータ点に対する勾配の期待値は、損失関数$f(\bm{w})$の勾配の不変推定量となっている \\
+		\item 1つのデータ点に対する勾配の期待値は、損失関数$f(\bm{w})$の勾配の不偏推定量となっている \\
 		$\Rightarrow$ $\mathbb{E} \left[ \nabla f_{i_t}(\bm{w}) \right] = \nabla f(\bm{w}^t)$であり、この手法が正当化される \newline \newline
 		$\Rightarrow$ 実際には、データ点のサンプリングによって、(真の勾配に対して)ノイズが加わった勾配が得られるため、パラメータの収束が遅くなる \\
 		$\Rightarrow$ 学習率(ステップサイズ)$h_t$の設定が重要になる
@@ -557,7 +559,7 @@
 		\newline
 		
 		\item SAGでは、計算される勾配にはバイアスが含まれる \\
-		$\Rightarrow$ 後述の\alert{SAGA}で計算される勾配の期待値は、勾配$f(\bm{w})$の不変推定量に一致
+		$\Rightarrow$ 後述の\alert{SAGA}で計算される勾配の期待値は、勾配$f(\bm{w})$の不偏推定量に一致
 	\end{itemize}
 \end{itemize}
 
@@ -666,8 +668,8 @@
 		\item SVRGとDANEは一見無関係にみえるが、実は深く関連し合う
 		\newline
 		
-		\item SVRGを改良した\alert{Federated SVRG}について説明する
-		\item Federated SVRGを更に改良したアルゴリズムを、新たに提案する \\
+		\item SVRGを改良した(Naiveな)\alert{Federated SVRG}について説明する
+		\item (Naiveな)Federated SVRGを更に改良したアルゴリズムを、新たに提案する \\
 		$\Leftarrow$ 各デバイスに保存された訓練データの個数、訓練データのスパース性、各デバイス上の訓練データのパターンの相違について考慮
 		\newline
 		
@@ -749,7 +751,7 @@
 		
 		\item 内側のループでは、データ点$i$における勾配$\nabla f_i(\bm{w}), \nabla f_i(\bm{w}^t)$を計算 \newline \newline
 		$\Rightarrow$ これらの勾配の差$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$を求めて、$\bm{w}$と$\bm{w}^t$におけるFull gradientの差分$\nabla f(\bm{w}) - \nabla f(\bm{w}^t)$を推定するための項とする \newline \newline
-		$\Rightarrow$ $\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t)$は、$\nabla f(\bm{w})$の\alert{不変推定量}を導く
+		$\Rightarrow$ $\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t)$は、$\nabla f(\bm{w})$の\alert{不偏推定量}を導く
 	\end{itemize}
 \end{itemize}
 
@@ -1009,7 +1011,7 @@
 		
 		\item SVRGアルゴリズムでは、外側のループの最初で、完全な勾配$\nabla f(\bm{w}^t)$を計算する必要があった(2行目)
 		\item 完全な勾配$\nabla f(\bm{w}^t)$は、各ノードが部分問題を解く前の段階で、既に求まっている(3行目) \\
-		$\Rightarrow$ 各ノードでは、SVRGアルゴリズムの内側のループのみが実行され(後述)、完全な勾配を求める必要はない(既知である)
+		$\Rightarrow$ 各ノードでは、SVRGアルゴリズムの内側のループのみが実行され(後述)、完全な勾配を求める必要はない(既知であるとして扱う)
 	\end{itemize}
 \end{itemize}
 
@@ -1070,7 +1072,7 @@
 		\newline
 		
 		\item 以下の2つのアルゴリズムは等価である
-		\item 従って、下記の2つのアルゴリズムは、同一のパラメータ列$\left\{ \bm{w}^t \right\}$を出力する
+		\item 下記の2つは、同一のパラメータ列$\left\{ \bm{w}^t \right\}$を出力
 	\end{itemize}
 	
 	\begin{enumerate}
@@ -1079,7 +1081,7 @@
 	\end{enumerate}
 	
 	\begin{itemize}
-		\item 分散化されたSVRGアルゴリズムを次に示す
+		\item 分散化されたSVRGアルゴリズム(Naive Federated SVRG)を次に示す
 	\end{itemize}
 \end{itemize}
 
@@ -1107,6 +1109,502 @@
 		\ENDFOR
 	\end{algorithmic}
 \end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 2つのアルゴリズムが等価であることの簡潔な証明
+	\begin{itemize}
+		\item SVRGアルゴリズムでは、$\nabla f(\bm{w}) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w})$の不偏推定量を得るために、$\nabla f(\bm{w}^t) + \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$という項を用いた
+		\newline
+		\item $\nabla f(\bm{w}^t)$は、外側のループの最初で計算される(適当な時間間隔で計算され、暫くの間固定される)
+		\item 内側のループを実行する度に、データ$i \in \left\{ 1, \ldots, N \right\}$について$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$を計算し、$\nabla f(\bm{w}^t)$を補正する
+		\newline
+		
+		\item DANEにおける部分問題を、各ノードがSVRGで解くことを考える(SVRGの\alert{内側のループのみ}が実行される)
+		\item SVRGで解くのは次の問題である($\mu = 0, \eta = 1$)
+		\begin{eqnarray}
+			&& \min_{\bm{w} \in \mathbb{R}^D} \left( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \eta \nabla f(\bm{w}^t) \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \right) \nonumber \\
+			&=& \min_{\bm{w} \in \mathbb{R}^D} \left( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \nabla f(\bm{w}^t) \right)^T \bm{w} \right)
+		\end{eqnarray}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 2つのアルゴリズムが等価であることの簡潔な証明
+	\begin{itemize}
+		\item SVRGで最小化しようとしている関数の勾配を求める
+		\begin{eqnarray}
+			&& \frac{\partial}{\partial \bm{w}} \left( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \nabla f(\bm{w}^t) \right)^T \bm{w} \right) \nonumber \\
+			&=& \nabla F_k(\bm{w}) - \nabla F_k(\bm{w}^t) - \nabla f(\bm{w}^t)
+		\end{eqnarray}
+		
+		\item 上式について、$\nabla f(\bm{w}^t)$は、DANEアルゴリズムの3行目で既に求まっている
+		\item 残りの$\nabla F_k(\bm{w})$と$\nabla F_k(\bm{w}^t)$の計算について考える
+		\newline
+		
+		\item $\nabla F_k(\bm{w}) = \sum_{i \in \mathcal{P}_k} \nabla f_i(\bm{w})$であるから、$\nabla F_k(\bm{w})$は、$i \in \mathcal{P}_k$である全ての$i$についての、勾配$\nabla f_i(\bm{w})$の足し合わせである($\nabla F_k(\bm{w}^t)$についても同様)
+		\newline
+		
+		\item SVRGの内側のループでは、ある1つのインデックス$i \in \mathcal{P}_k$をランダムに選び出し、パラメータ$\bm{w}$を更新する
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 2つのアルゴリズムが等価であることの簡潔な証明
+	\begin{itemize}
+		\item SVRGの内側のループでは、ある1つのインデックス$i \in \mathcal{P}_k$をランダムに選び出し、パラメータ$\bm{w}$を更新する \newline \newline
+		$\Rightarrow$ 内側のループでは、1つのデータ点$i$についての\alert{確率的勾配だけを使って}、$\nabla F_k(\bm{w}) - \nabla F_k(\bm{w}^t) - \nabla f(\bm{w}^t)$を推定したい \newline \newline
+		$\Rightarrow$ $\nabla f(\bm{w}^t)$は既知であるから、残りの項$\nabla F_k(\bm{w}) - \nabla F_k(\bm{w}^t)$を、確率的勾配$\nabla f_i(\bm{w}), \nabla f_i(\bm{w}^t)$を使って近似する
+		\newline
+		
+		\item SVRGのときと同じ方法で、次のように近似できる
+		\begin{eqnarray}
+			\nabla F_k(\color{red}\bm{w}\normalcolor) &=& \nabla F_k(\bm{w}^t) + \left( \nabla f_i(\color{red}\bm{w}\normalcolor) - \nabla f_i(\bm{w}^t) \right) \\
+			\nabla F_k(\color{red}\bm{w}^t\normalcolor) &=& \nabla F_k(\bm{w}^t) + \left( \nabla f_i(\color{red}\bm{w}^t\normalcolor) - \nabla f_i(\bm{w}^t) \right)
+		\end{eqnarray}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 2つのアルゴリズムが等価であることの簡潔な証明
+	\begin{itemize}
+		\item 以下は単に、$f(\bm{w})$を$F_k(\bm{w})$に置き換えているだけ
+		\begin{equation}
+			\nabla F_k(\bm{w}) = \nabla F_k(\bm{w}^t) + \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) \right)
+		\end{equation}
+		
+		\item $\nabla F_k(\bm{w}^t)$を、内側のループが実行される度に計算するのは、計算コストの観点から避けたいので、適当な時間間隔で求めて、暫くの間は使い回すことにする \newline \newline
+		$\Rightarrow$ 現在のパラメータ$\bm{w}$についての勾配$\nabla F_k(\bm{w})$の不偏推定量を得るために、古いパラメータ$\bm{w}^t$についての勾配$\nabla F_k(\bm{w}^t)$を、\color{red}データ$i$についての項$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$で補正\normalcolor する
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item 2つのアルゴリズムが等価であることの簡潔な証明
+	\begin{itemize}
+		\item このような近似の下で、内側のループで計算される勾配は、次のようになる
+		\begin{eqnarray}
+			&& \nabla F_k(\bm{w}) - \nabla F_k(\bm{w}^t) - \nabla f(\bm{w}^t) \\
+			&=& \left[ \nabla F_k(\bm{w}^t) + \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) \right] \nonumber \\
+			&& \qquad - \left[ \nabla F_k(\bm{w}^t) + \nabla f_i(\bm{w}^t) - \nabla f_i(\bm{w}^t) \right] - \nabla f(\bm{w}^t) \\
+			&=& \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t)
+		\end{eqnarray}
+		
+		\item これより、DANEアルゴリズムの部分問題に、SVRGアルゴリズムを適用したとき、各ノードにおけるパラメータの更新式は次のようになる
+		\begin{equation}
+			\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]
+		\end{equation}
+		
+		\item 上の更新式は、FSVRG(Algorithm \ref{alg:naive-federated-svrg})の8行目と等しい \\
+		$\Rightarrow$ DANE($\mu = 0, \eta = 1$)の部分問題にSVRGを組み込んだアルゴリズムは、(Naiveな)FSVRGと等価
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item Naive Federated SVRGについての補足
+	\begin{itemize}
+		\item 外側のループについて、最後の更新式が次のようになっている
+		\begin{equation}
+			\bm{w}^{t + 1} = \bm{w}^t + \frac{1}{K} \sum_{k = 1}^K \left( \bm{w}_k - \bm{w}^t \right)
+		\end{equation}
+		
+		\item これは、DANEにおける次の式に等しい
+		\begin{equation}
+			\bm{w}^{t + 1} = \frac{1}{K} \sum_{k = 1}^K \bm{w}_k^{t + 1}
+		\end{equation}
+		
+		\item $\left( \bm{w}_k - \bm{w}^t \right)$は、各ノードから中央のサーバに送られる、パラメータの差分を表している \\
+		$\Rightarrow$ $\bm{w}^t$が中央のサーバから送られてきたパラメータ、$\bm{w}_k$はノード$k$上の訓練データを使って更新されたパラメータ \\
+		$\Rightarrow$ $\bm{w}_k$をそのまま送っても良いが、差分を送った方がデータを圧縮できる(通信量を削減)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item SVRGアルゴリズムの導出
+	\begin{itemize}
+		\item (Naiveな)Federated SVRGを更に改良したアルゴリズムを、ここでは提案する \\
+		$\Leftarrow$ 各デバイスに保存された訓練データの個数、訓練データのスパース性、データが独立同分布でない(\alert{Non-IID})ことについて考慮
+		\newline
+		
+		\item 各デバイス間では、訓練データの個数が大きく異なる
+		\item データのある特徴は、ごく少数のノードにだけ出現し、それ以外の大多数のノードには出現しないかもしれない
+		\item 各デバイス上のデータは、データ全体の分布を表していない(データ全体は、デバイスの地理的な位置やタイムゾーンなどが影響し、特定のパターンによってクラスタ化されているかもしれない)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item SVRGアルゴリズムの導出(記法の整理)
+	\begin{itemize}
+		\item $N$: 訓練データの個数, $K$: ノード数, $D$: パラメータの次元
+		\newline
+		
+		\item $\mathcal{P}_k$: ノード$k$が保持する訓練データのインデックスの集合 \\
+		$\Rightarrow$ $\mathcal{P}_k \subseteq \left\{ 1, \ldots, N \right\}, \forall k \neq l \ \mathcal{P}_k \cap \mathcal{P}_l = \varnothing$ \\
+		\item $N_k = |\mathcal{P}_k|$: ノード$k$が保持する訓練データの個数 \\
+		$\Rightarrow$ $\sum_{k = 1}^K N_k = N$
+		\newline
+		
+		\item $N^j = \left| \left\{ i \in \left\{ 1, \ldots, N \right\} | \bm{x}_i^T \bm{e}_j \neq 0 \right\} \right|$: $j$番目の次元が$0$ではない訓練データの個数
+		\item $N_k^j = \left| \left\{ i \in \mathcal{P}_k | \bm{x}_i^T \bm{e}_j \neq 0 \right\} \right|$: ノード$k$が保持する、$j$番目の次元が$0$ではない、訓練データの個数
+		\newline
+		
+		\item $\phi^j = N^j / N$: 全訓練データのうち、$j$番目の次元が$0$でないものの割合
+		\item $\phi_k^j = N_k^j / N_k$: ノード$k$が保持する全訓練データのうち、$j$番目の次元が$0$でないものの割合
+		
+		\framebreak
+		
+		\item $s_k^j = \phi^j / \phi_k^j$: 全訓練データと、ノード$k$が保持する訓練データにおける、$j$番目の次元が$0$でない割合の比率 \\
+		$\Rightarrow$ $s_k^j$が小さいとき、ノード$k$は、次元$j$に関する訓練データを、他のノードよりも多く持っていることを意味している \\
+		$\Rightarrow$ $s_k^j$の逆数は、ノード$k$が持っている訓練データは、次元$j$に関してどの程度レアかを表すと考えられる
+		\newline
+		
+		\item $\bm{S}_k = \diag \left( s_k^j \right)$: $s_k^j$を並べた対角行列($\bm{S}_k \in \mathbb{R}^{D \times D}$)
+		\item $\omega^j = \left| \left\{ \mathcal{P}_k | n_k^j \neq 0 \right\} \right|$: 次元$j$が$0$ではない訓練データを持っている、ノードの数
+		\newline
+		
+		\item $a^j = K / \omega^j$: 次元$j$が$0$でない訓練データが、ノードに出現する割合 \\
+		$\Rightarrow$ 次元$j$のレア度を表す
+		\item $\bm{A} = \diag \left( a^j \right)$: $a^j$を並べた対角行列($\bm{A} \in \mathbb{R}^{D \times D}$)
+		\newline
+		
+		\item 提案されたFederated SVRGアルゴリズムを、次に示す
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Federated SVRG (FSVRG) ~\cite{1610.02527}}
+	\label{alg:federated-svrg}
+	\Parameter{$h = $stepsize, data partition $\left\{ \mathcal{P}_k \right\}_{k = 1}^K$, diagonal matrix $\bm{A}, \bm{S}_k \in \mathbb{R}^{D \times D}$ for $k \in \left\{ 1, \ldots, K \right\}$} 
+	\begin{algorithmic}[1]
+		\FOR{$t = 0, 1, \ldots$}
+			\STATE{Compute $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$}
+			\FOR{$k = 1$ to $K$ \textbf{do in parallel} over nodes $k$}
+				\STATE{Initialize $\bm{w}_k = \bm{w}^t$, $h_k = h / N_k$}
+				\STATE{Let $\left\{ i_s \right\}_{s = 1}^{N_k}$ be random permutation of $\mathcal{P}_k$}
+				\FOR{$s = 1, \ldots, N_k$}
+					\STATE{$\bm{w}_k = \bm{w}_k - \color{red}h_k\normalcolor \left[ \color{red}\bm{S}_k\normalcolor \left[ \nabla f_{i_s}(\bm{w}_k) - \nabla f_{i_s}(\bm{w}^t) \right] + \nabla f(\bm{w}^t) \right]$}
+				\ENDFOR
+			\ENDFOR
+			\STATE{$\bm{w}^t = \bm{w}^t + \color{red}\bm{A}\normalcolor \sum_{k = 1}^K \color{red}\frac{N_k}{N}\normalcolor \left( \bm{w}_k - \bm{w}^t \right)$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item Federated SVRGアルゴリズムの改良点
+	\begin{enumerate}
+		\item ノードごとにステップサイズを変更: $h_k = h / N_k$
+		\item 各ノードが保持するデータ数に比例した更新量: $\frac{N_k}{N} \left( \bm{w}_k - \bm{w}^t \right)$
+		\item 確率的勾配の各次元に対するスケーリング: $\bm{S}_k$
+		\item パラメータの差分の各次元に対するスケーリング: $\bm{A} \left( \bm{w}_k - \bm{w}^t \right)$
+	\end{enumerate}
+	
+	\begin{itemize}
+		\item \sout{個人的に、このようなアルゴリズムの細工にはあまり魅力を感じない}
+		\item \sout{このような細工よりも、単純にデータ数を増やせば良いんじゃないか?}
+		\newline
+		
+		\item このアルゴリズムは、他のアルゴリズムよりも圧倒的に収束が速い
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{enumerate}
+	\item ノードごとにステップサイズを変更: $h_k = h / N_k$
+	\begin{itemize}
+		\item Naive Federated SVRGでは、各ノードでのパラメータの更新回数は、$m$回に統一されていた \\
+		$\Rightarrow$ しかし、各ノードが保持する訓練データの数は大きく異なるのだから、パラメータの更新回数を、全ノードにわたって同じにするのは良くない \\
+		$\Rightarrow$ それゆえ、各ノードでは、自身が持つ全ての訓練データを使って、パラメータを更新
+		\newline
+		
+		\item ステップサイズを$N_k$に反比例するように設定し、各ノードのパラメータ更新量が同程度の大きさになるようにする
+	\end{itemize}
+	
+	\framebreak
+	
+	\item 各ノードが保持するデータ数に比例した更新量: $\frac{N_k}{N} \left( \bm{w}_k - \bm{w}^t \right)$
+	\begin{itemize}
+		\item Naive Federated SVRGでは、以下のようにパラメータ$\bm{w}$が更新された
+		\begin{eqnarray}
+			\bm{w}^{t + 1} &=& \bm{w}^t + \frac{1}{K} \sum_{k = 1}^K \left( \bm{w}_k - \bm{w}^t \right) \nonumber \\
+			&=& \bm{w}^t + \frac{h}{K} \sum_{k = 1}^K \sum_i \left[ \nabla f_i(\bm{w}_k) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right] \nonumber \\
+			&=& \bm{w}^t + \frac{h}{K} \sum_{k = 1}^K \sum_i \left[ \nabla f_i(\color{red}\bm{w}\normalcolor) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right] \nonumber \\
+			&\simeq& \bm{w}^t + \frac{h}{K} \sum_{k = 1}^K \mathbb{E} \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right] \nonumber \\
+			&=& \bm{w}^t + \frac{h}{K} \mathbb{E} \left[ \sum_{k = 1}^K \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right) \right] \nonumber
+		\end{eqnarray}
+		
+		\framebreak
+		
+		\item 上式における$i$は、$\mathcal{P}_k$から重複を許して、適当に選択された$m$個のインデックスであるとする (但し、最後の式における$i$は、$\mathcal{P}_k$から適当に選択されたインデックスである)
+		\item また、ある時点において、全ての$k \in \left\{ 1, \ldots, K \right\}$について$\bm{w}_k = \bm{w}$であるとしている
+		\newline
+		
+		\item ここでは、適当な$\alpha_k$を導入して、$\nabla f(\bm{w}^t)$の不偏推定量が得られるようにしたい($i$は$\mathcal{P}_k$から適当に選択されたもの) \\
+		$\Leftarrow$ 勾配降下法などの、目的関数の勾配のみを用いたアルゴリズム(\alert{一次法}; First-order method)に対して求められる性質
+		\newline
+		
+		\item 即ち、以下が成り立って欲しい($\bm{w}^t$に足される量が、$\nabla f(\bm{w}^t)$に比例する)
+		\begin{equation}
+			\mathbb{E} \left[ \sum_{k = 1}^K \alpha_k \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right) \right] = \nabla f(\bm{w}^t)
+		\end{equation}
+		
+		\framebreak
+		
+		\item $\alpha_k$は次のようにして求められる
+		\begin{eqnarray}
+			&& \mathbb{E} \left[ \sum_{k = 1}^K \alpha_k \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right) \right] \nonumber \\
+			&=& \sum_{k = 1}^K \alpha_k \mathbb{E} \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right] \nonumber \\
+			&\simeq& \sum_{k = 1}^K \alpha_k \frac{1}{N_k} \sum_{i \in \mathcal{P}_k} \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]
+		\end{eqnarray}
+		
+		\item $\alpha_k = N_k / N$とすることで以下を得る
+		\begin{equation}
+			= \frac{1}{N} \sum_{k = 1}^K \sum_{i \in \mathcal{P}_k} \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right] \simeq \nabla f(\bm{w}) \nonumber
+		\end{equation}
+		
+		\framebreak
+		
+		\item これより、各ノードで計算されたパラメータの差分が、$N_k$に比例するように、更新量を調節することが考えられる
+		\begin{eqnarray}
+			\bm{w}^{t + 1} &=& \bm{w}^t + \frac{h}{K} \mathbb{E} \left[ \sum_{k = 1}^K \frac{N_k}{N} \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right) \right] \nonumber \\
+			&=& \bm{w}^t + \frac{h}{K} \frac{N_k}{N} \mathbb{E} \left[ \sum_{k = 1}^K \left( \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right) \right] \nonumber
+		\end{eqnarray}
+	\end{itemize}
+	
+	\framebreak
+	
+	\item 確率的勾配の各次元に対するスケーリング: $\bm{S}_k$
+	\begin{itemize}
+		\item 行列$\bm{S}_k$は、$s_k^j = \phi^j / \phi_k^j$を対角成分にもつ
+		\newline
+		
+		\item データ数が$N = 10^6$、ノード数が$K = 10^3$であるとする
+		\item 次元$j$が非零になるデータは$10^3$個あるが、その全てが、ある1つのノード$k$に集中しているとする
+		\item このとき$s_k^j = \phi^j / \phi_k^j = 10^{-3}$であるので、ノード$k$でパラメータ$\bm{w}$が更新されるとき、次元$j$の更新量は$10^3$分の$1$倍される
+		\newline
+		
+		\item 行列$\bm{S}_k$でスケーリングを行わない場合、ノード$k$における、次元$j$に対する更新量は、他のノードの$10^3$倍程度になる(或いは、パラメータ$\bm{w}$の次元$j$は、ノード$k$でしか更新されない) \\
+		$\Rightarrow$ パラメータ$\bm{w}$の次元$j$について、急速に発散してしまう恐れがある
+		\newline
+		
+		\item パラメータ$\bm{w}$の更新に使用する、勾配の(推定量の)各次元が、大体同じになるように揃える役割(個人的には、まだよく理解できていない)
+	\end{itemize}
+	
+	\framebreak
+	
+	\item パラメータの差分の各次元に対するスケーリング: $\bm{A} \left( \bm{w}_k - \bm{w}^t \right)$
+	\begin{itemize}
+		\item 行列$\bm{A}$は、$a_j = K / \omega_j$を対角成分にもつ
+		\newline
+		
+		\item 行列$\bm{A}$の各成分は、$\omega_j$に反比例している \\
+		$\Rightarrow$ 次元$j$が非零であるデータを持つノード数$\omega_j$が少ないほど、パラメータ$\bm{w}$の次元$j$に対する更新量は大きくなる \newline \newline
+		$\Rightarrow$ $\omega_j$が小さいとき、少ないノードから、次元$j$に関する情報が伝達されているので、その情報の価値は高い(パラメータ$\bm{w}$の次元$j$の更新に際して、大いに役立つ情報である)と考えられる(従って更新量を大きくする)
+		\newline
+		
+		\item 4つの改善のうち、どれが最も効果的であったかは不明であるほか、これらの改善策が、相互に干渉し合うと思われる
+		\item $h_k, \frac{N_k}{N}, \bm{S}_k, \bm{A}$によって、適切なスケーリングを行うことで、各ノード上の訓練データ数のばらつき、データのスパース性などに対処できそうなのは、直感的には分かる
+	\end{itemize}
+\end{enumerate}
+
+\end{frame}
+
+\section{最適化アルゴリズムの比較}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}
+		\item Google+の投稿に、1つ以上のコメントが付くかどうかを予測する、二値分類のタスク
+		\item L2正則化項を含めたロジスティック回帰
+		\newline
+		
+		\item Google+の投稿から作成したデータセットを、実験に使用
+		\item 各ユーザの投稿が、各ユーザの使うデバイス上に保存されているという状況を想定
+		\item $10^2$以上のパブリックな投稿を英語で行っている、$10^4$のユーザをランダムに選択
+		\item 選択されたユーザの投稿を集めて、そのうちの$75\%$にあたる$N = 2,166,693$個を訓練データとした
+		\newline
+		
+		\item 入力データとなる投稿はBag-of-words形式に変換された \\
+		$\Leftarrow$ (全投稿データを基に得られた)最頻出単語$20,000$語と、それ以外の不明な単語の出現回数と、バイアス項を加えたことで、パラメータ数は$D = 20,002$となった
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}
+		\item 各ユーザが投稿する内容は一般に異なるので、各ユーザが保持するデータの特徴も全く異なる \\
+		$\Rightarrow$ 各ユーザの投稿内容は、全データの分布内で、クラスタを形成していると考えられる \\
+		$\Rightarrow$ 各ユーザの保持するデータは、独立同分布標本とは\alert{仮定できない} \\
+		$\Rightarrow$ もしそのような仮定をすると、全てのユーザが、あらゆる内容の投稿を満遍なくしていることになる
+		\newline
+		
+		\item 入力データはBag-of-words形式であるから、非常にスパースである \\
+		$\Rightarrow$ 殆どの投稿は、ごく一部の単語しか含んでいないので、入力データの中で非零になる要素数が少ない \\
+		$\Rightarrow$ 殆どの次元は、非零になる(その次元に対応する特徴が出現する)確率が低い \\
+		$\Rightarrow$ 入力データの各特徴の出現確率を、次の図\ref{fig:feature-appearance-on-nodes}に示す(不明な単語を表す次元の出現率が高くなっているが、これは実際とは異なる)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=0.67, clip, trim=2.4cm 17.5cm 2.4cm 2.4cm, page=24]{papers/Federated-Optimization-Distributed-Machine-Learning-for-On-Device-Intelligence-1610-02527.pdf}
+	\caption{特徴の出現確率のヒストグラム~\cite{1610.02527}}
+	\label{fig:feature-appearance-on-nodes}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}
+		\item Google+の投稿に、1つ以上のコメントが付くかどうかを予測する、二値分類のタスク
+		\item L2正則化項を含めたロジスティック回帰の、テストデータに対する誤差(分類誤り)を示す
+		\newline
+		
+		\item 全ての投稿に対して、コメントが付かない($-1$)という予測をすると、誤差は$33.16\%$
+		\item 入力データを全て用いて、通常のロジスティック回帰を行うと、誤差は$26.27\%$
+		\item 各ユーザの全ての投稿に対して、同一の予測をすると、誤差は$17.14\%$ \\
+		$\Rightarrow$ 個々の投稿内容ではなく、誰が投稿しているのかに着目して、コメントが付くかどうかの予測を行った方が、精度が良くなることを示唆(直感的にもそうである)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}
+		\item 全ユーザで共通のモデルを基に、各ユーザごとにチューニングすることで、精度を向上させられる可能性 \\
+		$\Rightarrow$ もし精度が大幅に向上するのであれば、各ノードごとに、異なるデータのパターンが出現していることも確認できる
+		\newline
+		
+		\item 各最適化アルゴリズムでの性能比較を行う
+		\item 提案手法(Federated SVRG; Algorithm \ref{alg:federated-svrg})のハイパーパラメータは、ステップサイズ$h$のみであるが、性能が最も良くなるものを選んだ
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}		
+		\item オフラインアルゴリズムで得られる最大の性能(OPT)、勾配降下法(GD)、CoCoA+アルゴリズム(詳細は略)、Federated SVRGアルゴリズム(FSVRG)、ランダムにデータをシャッフルした上で行うFederated SVRG(FSVRGR)の性能を比較
+		\begin{itemize}
+			\item GD: 個々のノードが、自身が持つ訓練データを全て使って、勾配降下法を行っている
+			\item CoCoA+: このスライドでは省略
+			\item FSVRG: この論文における提案手法
+			\item FSVRGR: 各ノードが保持するデータ数は変化させない(ばらつきは維持する)が、データを一旦全て集めて、ランダムにシャッフルした上で、個々のノードに戻している(各ノードが保持するデータがIIDではなくても、FSVRGアルゴリズムが動作することを示すために用意してある)
+		\end{itemize} \
+		
+		\item 目的関数の推移、またはテストデータに対する分類誤差の推移を縦軸に、そして各デバイスと中央のサーバとの一連のやり取り(Round)の回数を横軸に取ったグラフを、次の図\ref{fig:algorithm-comparison}に示す
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{figure}
+	\centering
+	\includegraphics[keepaspectratio, scale=0.67, clip, trim=2.4cm 18cm 2.4cm 2.4cm, page=25]{papers/Federated-Optimization-Distributed-Machine-Learning-for-On-Device-Intelligence-1610-02527.pdf}
+	\caption{最適化アルゴリズムの性能比較~\cite{1610.02527}}
+	\label{fig:algorithm-comparison}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{最適化アルゴリズムの比較}
+
+\begin{itemize}
+	\item 最適化アルゴリズムの比較
+	\begin{itemize}
+		\item FSVRGは、僅か30回程度のRoundで収束しており、Federated Optimizationにおける課題を最初に解決したアルゴリズムといえる \newline \newline
+		$\Rightarrow$ CoCoA+や、それ以外の通信効率の良い(Communication-Efficient)分散アルゴリズムでも、収束していない(学習が上手く行っていない) \newline \newline
+		$\Rightarrow$ 学習が上手く行かないのは、他のアルゴリズムでは、全てのデバイスが独立同分布なデータをもつと仮定しているため
+		\newline
+		
+		\item FSVRGとFSVRGRの結果の差はごく僅かであり、Naive Federated SVRGを改良することで、各デバイスが持つデータの分布に左右されない(ロバストな)アルゴリズムを得られた
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\section{結論}
+
+\begin{frame}{結論}
+
+\begin{itemize}
+	\item Federated Learningの特徴
+	\begin{itemize}
+		\item \alert{Massively Distributed}、\alert{Non-IID}、\alert{Unbalanced}、\alert{Privacy Sensitive}、\alert{Sparse}の5つが挙げられる
+		\newline
+		\item これらの性質をもつ厳しい環境下においても、効率的に学習が進むアルゴリズムを設計可能
+	\end{itemize} \
+	
+	\item 今後の研究の方向性について
+	\begin{itemize}
+		\item 非同期版のアルゴリズムの開発や、アルゴリズムの理論的な解明(特に収束性)
+		\item 非凸関数の最適化(ニューラルネットが代表例)についての理論的な解明
+		\item 全ユーザ間で共有されるモデルと、個々のユーザに特化したモデル双方の活用
+	\end{itemize}
+\end{itemize}
 
 \end{frame}
 
