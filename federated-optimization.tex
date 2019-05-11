@@ -10,6 +10,8 @@
 \usepackage{algorithmic}
 
 \SetKwInOut{Parameter}{parameters}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
 
 \newcommand\AlgoCommentFont[1]{\ttfamily\textcolor{blue}{#1}}
 \SetCommentSty{AlgoCommentFont}
@@ -483,6 +485,9 @@
 		\newline
 		
 		\item 主問題と双対問題を、交互に解くアルゴリズムも考えられる
+		\newline
+		
+		\item 以降のスライドでは、勾配$\nabla f(\bm{w})$の推定値に含まれる\alert{ノイズ}を軽減するアルゴリズムをみていく
 	\end{itemize}
 \end{itemize}
 
@@ -592,7 +597,7 @@
 	\item SVRG; Stochastic Variance Reduced Gradient
 	\begin{itemize}
 		\item 二重ループの最適化アルゴリズムである
-		\item 外側のループでは、全データ点についての完全な勾配$\nabla f(\bm{w}^t)$を計算
+		\item 外側のループでは、Full gradient(全データについての勾配の平均)$\nabla f(\bm{w}^t)$を計算
 		\begin{equation}
 			\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \left. \frac{\partial}{\partial \bm{w}} f_i(\bm{w}) \right|_{\bm{w} = \bm{w}^t}
 		\end{equation}
@@ -625,7 +630,7 @@
 			\STATE{Set $\bm{w} = \bm{w}^t$}
 			\FOR{$t = 1$ \TO $m$}
 				\STATE{Pick $i \in \left\{ 1, \ldots, N \right\}$, uniformly at random}
-				\STATE{$\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$} \tcp*{Stochastic update}
+				\STATE{Update using $\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$} \tcp*{Stochastic update}
 			\ENDFOR
 			\STATE{$\bm{w}^{t + 1} = \bm{w}$}
 		\ENDFOR
@@ -634,13 +639,474 @@
 
 \end{frame}
 
+\begin{frame}{分散を抑えた確率的勾配降下法}
+
+\begin{itemize}
+	\item アルゴリズムについての補足
+	\begin{itemize}
+		\item SGDと比較するとSVRGの性能は良く、各イテレーションでの分散が小さい
+		\newline
+		
+		\item SVRGと、ランダム化された座標降下法(RCD; Randomized Coordinate Descent)とを結びつけるアルゴリズムが存在
+		\item SAGAが提唱された論文では、SAGAはSAGとSVRGの中間に位置付けられている
+		\item SVRG、SAGA、SAG、GDを一般化したアルゴリズムが登場している
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
 \section{Federated Learningのための最適化アルゴリズム}
 
 \begin{frame}{Federated Learningのための最適化アルゴリズム}
 
 \begin{itemize}
-	\item 
+	\item Federated Learningのための最適化アルゴリズム
+	\begin{itemize}
+		\item \alert{SVRG}(Stochastic Variance Reduced Gradient)アルゴリズムと、\alert{DANE}(Distributed Approximate Newton)アルゴリズムを調べる
+		\item SVRGとDANEは一見無関係にみえるが、実は深く関連し合う
+		\newline
+		
+		\item SVRGを改良した\alert{Federated SVRG}について説明する
+		\item Federated SVRGを更に改良したアルゴリズムを、新たに提案する \\
+		$\Leftarrow$ 各デバイスに保存された訓練データの個数、訓練データのスパース性、各デバイス上の訓練データのパターンの相違について考慮
+		\newline
+		
+		\item Federated Learningでは、訓練データが\alert{Massively Distributed}、\alert{Non-IID}、\alert{Unbalanced}であるという仮定を置く
+		\item これに加え、\alert{スパース性}、\alert{Privacy Sensitive}などの仮定を設けた
+	\end{itemize}
 \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item Federated Learningのためのアルゴリズムに必要な特徴
+	\begin{enumerate}
+		\item アルゴリズムの開始時に、パラメータが既に最適値であったなら、そのアルゴリズムを何度実行しても、パラメータの値が変化しない \label{enum:fl-algorithm-feature-a}
+		\newline
+		\item 訓練データが単一のノードにしかないとき、パラメータが収束するまでに必要な、中央のノードとの通信回数は$\mathcal{O}(1)$に抑えられること \label{enum:fl-algorithm-feature-b}
+		\newline
+		\item データの各特徴が、単一のノードにしか現れないとき(解こうとしている問題が完全に分離され、各デバイスがパラメータの一部を学習しているとき)、$\mathcal{O}(1)$回の通信回数の後に、パラメータが収束すること \label{enum:fl-algorithm-feature-c} \newline \newline
+		$\Leftarrow$ データの各次元が、ある1つのノードでは$1$になるが、他の全てのノードでは$0$になるような場合
+		\newline
+		\item 各ノードが完全に同一なデータセットを有するとき、$\mathcal{O}(1)$回の通信回数の後に、パラメータが収束すること \label{enum:fl-algorithm-feature-d}
+	\end{enumerate}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item Federated Learningのためのアルゴリズムに必要な特徴
+	\begin{itemize}
+		\item 「収束する」とは、「十分に精度のある適当な解が得られる」ことを意味している \\
+		$\Rightarrow$ $\mathcal{O}(1)$回とは、各デバイスと中央のノード間で、\alert{たった1度だけ}やり取りすることに相当
+		\newline
+		
+		\item (\ref{enum:fl-algorithm-feature-a})は、全ての最適化問題において、考慮する価値がある設定
+		\item (\ref{enum:fl-algorithm-feature-b})と(\ref{enum:fl-algorithm-feature-c})は、Federated Learningにおける極端なケース
+		\item (\ref{enum:fl-algorithm-feature-d})は、従来の最適化問題における設定(中央の少数のノードが多量のデータを保持している状況) \\
+		$\Rightarrow$ (\ref{enum:fl-algorithm-feature-d})は、Federated Learningにおいては最も重要でない
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{SVRG; Stochastic Variance Reduced Gradient (Recall) ~\cite{stochastic_2017}}
+	\label{alg:svrg-recall}
+	\Parameter{$m = $ number of stochastic steps per epoch, $h = $ stepsize (learning rate)}
+	\begin{algorithmic}[1]
+		\FOR{$s = 0, 1, \ldots$}
+			\STATE{Compute and store full gradient $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$} \tcp*{Full pass through data}
+			\STATE{Set $\bm{w} = \bm{w}^t$}
+			\FOR{$t = 1$ \TO $m$}
+				\STATE{Pick $i \in \left\{ 1, \ldots, N \right\}$, uniformly at random}
+				\STATE{Update using $\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$} \tcp*{Stochastic update}
+			\ENDFOR
+			\STATE{$\bm{w}^{t + 1} = \bm{w}$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item SVRG; Stochastic Variance Reduced Gradient
+	\begin{itemize}
+		\item 外側のループでは、Full gradient(全データについての勾配の平均)$\nabla f(\bm{w}^t)$を計算
+		\item 内側のループでは、確率的勾配によるパラメータの更新を$m$回実行 \\
+		$\Rightarrow$ $m$は、データ数$N$の$1$倍から$5$倍程度の値に設定 \\
+		$\Rightarrow$ $m$は、実用上は$N$にすることが多い
+		\newline
+		
+		\item 内側のループでは、データ点$i$における勾配$\nabla f_i(\bm{w}), \nabla f_i(\bm{w}^t)$を計算 \newline \newline
+		$\Rightarrow$ これらの勾配の差$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$を求めて、$\bm{w}$と$\bm{w}^t$におけるFull gradientの差分$\nabla f(\bm{w}) - \nabla f(\bm{w}^t)$を推定するための項とする \newline \newline
+		$\Rightarrow$ $\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t)$は、$\nabla f(\bm{w})$の\alert{不変推定量}を導く
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item SVRG; Stochastic Variance Reduced Gradient
+	\begin{itemize}
+		\item 更新中の$\bm{w}$と、固定された$\bm{w}^t$との差が小さければ、$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$も小さくなるので、$\nabla f(\bm{w})$(の予測値)に加わるノイズも小さくなっていると予想できる
+		\newline
+		
+		\item 内側のループを実行する度に、$\bm{w}$が$\bm{w}^t$から離れていくので、$\nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t)$が増大し、従ってFull gradient$\nabla f(\bm{w}^t)$に加わるノイズが増大 \\
+		$\Rightarrow$ 外側のループが実行され、新たなFull gradient$\nabla f(\bm{w}^{t + 1})$が計算されると、Full gradientに加わるノイズは再び小さくなる
+		\newline
+		
+		\item 関数$f = \frac{1}{N} \sum_i f_i$が$\lambda$-strongly convex functionで、各$f_i$が$L$-smooth functionならば、収束度合いは次のように表される(詳細は論文を参照)
+		\begin{equation}
+			\mathbb{E} \left[ f(\bm{w}^t) - f(\bm{w}^*) \right] \le c^t \left[ f(\bm{w}^0) - f(\bm{w}^*) \right]
+		\end{equation}
+		$\bm{w}^*$は$f(\bm{w})$を最小化する最適解、$c = \Theta \left( \frac{1}{mh} \right) + \Theta(h)$(詳細は略)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item 解くべき問題は、経験損失$f(\bm{w})$の最小化であった
+		\begin{equation}
+			\min_{\bm{w} \in \mathbb{R}^D} f(\bm{w}), \qquad f(\bm{w}) = \frac{1}{N} \sum_{i = 1}^N f_i(\bm{w})
+		\end{equation}
+		\item 各$f_i$は凸関数で、訓練データ$\left\{ \bm{x}_i, y_i \right\}_{i = 1}^N$が与えられている(多数のノードに不均等に分散)
+	\end{itemize} \
+	
+	\item 分散学習のために、以下の記法を導入する
+	\begin{itemize}
+		\item $K$を\alert{ノード数}とする
+		\item $\mathcal{P}_k$を、ノード$k \in \left\{ 1, \ldots, K \right\}$が持つ訓練データの\alert{インデックス集合}とする
+		\item ノード$k$が持つ訓練データの個数を、$N_k = \left| \mathcal{P}_k \right|$と表す \\
+		$\Rightarrow$ $k \neq l$のとき$\mathcal{P}_k \cap \mathcal{P}_l = \varnothing$(空集合)、そして$\sum_{k = 1}^K N_k = N$
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item 経験損失$f(\bm{w})$を、次の手順で書き直す
+		\begin{eqnarray}
+			F_k(\bm{w}) &\equiv& \frac{1}{N_k} \sum_{i \in \mathcal{P}_k} f_i(\bm{w}) \\
+			f(\bm{w}) &=& \frac{1}{N} \sum_{i = 1}^N f_i(\bm{w}) = \frac{1}{N} \sum_{k = 1}^K \sum_{i \in \mathcal{P}_k} f_i(\bm{w}) \nonumber \\
+			&=& \frac{1}{N} \sum_{k = 1}^K N_k \cdot \frac{1}{N_k} \sum_{i \in \mathcal{P}_k} f_i(\bm{w}) = \frac{1}{N} \sum_{k = 1}^K N_k F_k(\bm{w})
+		\end{eqnarray}
+		
+		\item $F_k(\bm{w})$は、各ノード$k$が最小化すべき目的関数である(凸関数)
+		\item これより、解くべき問題は次のように書き直される
+		\begin{equation}
+			\min_{\bm{w} \in \mathbb{R}^D} f(\bm{w}), \qquad f(\bm{w}) = \sum_{k = 1}^K \frac{N_k}{N} F_k(\bm{w})
+		\end{equation}
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item この問題を解くための最も簡単な手法は、次の通りである
+		\begin{equation}
+			\bm{w}_k^{t + 1} = \argmin_{\bm{w} \in \mathbb{R}^D} F_k(\bm{w}), \qquad \bm{w}^{t + 1} = \sum_{k = 1}^K \frac{N_k}{N} \bm{w}_k^{t + 1}
+		\end{equation}
+		
+		\item 各ノード上で目的関数$F_k$を最小化し、得られた解$\bm{w}_k^{t + 1}$の$N_k$による重み付け和を$\bm{w}$とする
+		\newline
+		
+		\item この場合、上の問題を一度だけ解けば、解$\bm{w}$が得られる($\bm{w}_k^{t + 1}$の右辺は$t$には依存しない)ので、各デバイスと中央のノードとの一度だけのやりとりで済む
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item 上記のアルゴリズムは\alert{動作しない} \\
+		$\Leftarrow$ 全体の解$\bm{w}$が、個々の解$\bm{w}_k$の重み付け和になっているとは考えにくい \newline \newline
+		$\Leftarrow$ 関数$F_k$の形が、全ての$k$について等しいならば、重み付け和にはなっている \\
+		$\Leftarrow$ 関数の形が全て等しいならば、単一のノード上で$\min_{\bm{w} \in \mathbb{R}^D} F_1(\bm{w})$を解けばよいので、分散アルゴリズムを考える必要はない
+		\newline
+		
+		\item 分散アルゴリズムを導出したいが、上記のアルゴリズムでは無意味
+		\item 但し、各ノード$k$が、目的関数$F_k$に含まれる曲がり具合の情報(Curvature information)を最大限活用できるようにしたい
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item 分散アルゴリズムを導出するために、各$F_k$に二次の項$-\left( \bm{a}_k^t \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2$を摂動として加算する
+		\newline
+		
+		\item そして、各ノードが次の問題を解くようにする
+		\begin{eqnarray}
+			\bm{w}_k^{t + 1} &=& \argmax_{\bm{w} \in \mathbb{R}^D} \left( F_k(\bm{w}) - \left( \bm{a}_k^t \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \right) \\
+			\bm{w}^{t + 1} &=& \frac{1}{K} \sum_{k = 1}^K \bm{w}_k^{t + 1}
+		\end{eqnarray}
+		
+		\item 各ノード$k$が、目的関数$F_k$に含まれる曲がり具合の情報(Curvature information)を最大限活用できるようにしたい \\
+		$\Rightarrow$ 各ノードが最適化する関数の、ヘッセ行列は$\nabla^2 F_k + \mu \bm{I}$となるので、関数$F_k$に含まれる勾配の情報は、殆どそのまま保存される
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための問題設定}
+
+\begin{itemize}
+	\item Federated Learningのための問題設定
+	\begin{itemize}
+		\item 以下の式を解きたいが、ベクトル$\bm{a}_k^t$の決め方が分からない
+		\begin{equation}
+			\bm{w}_k^{t + 1} = \argmax_{\bm{w} \in \mathbb{R}^D} \left( F_k(\bm{w}) - \left( \bm{a}_k^t \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \right) \nonumber
+		\end{equation}
+		
+		\item $t \to \infty$の極限では、$\bm{w}$が最適($\bm{w} = \bm{w}^*$)であるとき、上式の勾配が$0$となって欲しい
+		\begin{eqnarray}
+			&& \nabla \left( F_k(\bm{w}) - \left( \bm{a}_k^t \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \right) \nonumber \\
+			&=& \nabla F_k(\bm{w}) - \bm{a}_k^t + \mu \left( \bm{w} - \bm{w}^t \right) = 0 \nonumber
+		\end{eqnarray}
+		
+		\item 即ち、$t \to \infty$の極限では、$\bm{a}_k^t$は次のようになって欲しい
+		\begin{equation}
+			\bm{a}_k^t = \nabla F_k(\bm{w}) + \mu \left( \bm{w} - \bm{w}^t \right) \simeq \nabla F_k(\bm{w}^*) \ \left( \because \bm{w}^* \simeq \bm{w}^t \right) \nonumber
+		\end{equation}
+		
+		\item 但し、$\bm{w}^*$を知らないので、$\bm{a}_k^t = \nabla F_k(\bm{w}^*)$とはできない \\
+		$\Rightarrow$ $t \to \infty$で、$\bm{a}_k^t \to \nabla F_k(\bm{w}^*)$となるような更新式を編み出す
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item DANE; Distributed Approximate Newton
+	\begin{itemize}
+		\item 先程の最適化問題は、双対問題と深く関連している \\
+		$\Rightarrow$ 但し、上記のような問題がノード数分だけ存在するので、複雑である
+		\newline
+		
+		\item DANEアルゴリズムでは、個々のノード上で解くための部分問題を構成することに主眼を置く \\
+		$\Leftarrow$ 部分問題は、各ノード上のデータと、完全な勾配$\nabla f(\bm{w}^t)$にのみ依存 \\
+		$\Leftarrow$ Full gradient$\nabla f(\bm{w}^t)$は、各デバイスと中央のノード間で、1度だけやり取りすれば計算可能
+		\newline
+		
+		\item DANEアルゴリズムを次に示す
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{DANE; Distributed Approximate Newton ~\cite{1610.02527}}
+	\label{alg:dane}
+	\Input{regularizer $\mu \ge 0$, parameter $\eta$ (default: $\mu = 0, \eta = 1$)}
+	\begin{algorithmic}[1]
+		\STATE{Initialize $\bm{w}^0$}
+		\FOR{$t = 0, 1, \ldots$}
+			\STATE{Compute $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$}
+			\STATE{Distribute $\nabla f(\bm{w}^t)$ to all machines}
+			\STATE{For each node $k \in \left\{ 1, \ldots, K \right\}$, solve
+			\begin{eqnarray}
+				&& \bm{w}_k^{t + 1} = \argmin_{\bm{w} \in \mathbb{R}^D} \bigg( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \eta \nabla f(\bm{w}^t) \right)^T \bm{w} \nonumber \\
+				&& \qquad \qquad \qquad + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \bigg)
+			\end{eqnarray}}
+			\STATE{Compute $\bm{w}^{t + 1} = \frac{1}{K} \sum_{k = 1}^K \bm{w}_k^{t + 1}$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item DANE; Distributed Approximate Newton
+	\begin{itemize}
+		\item 5行目では、各ノードが次の部分問題を解いている
+		\begin{equation}
+			\bm{w}_k^{t + 1} = \argmin_{\bm{w} \in \mathbb{R}^D} \left( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \eta \nabla f(\bm{w}^t) \right)^T \bm{w} + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \right) \nonumber
+		\end{equation}
+		
+		\item この部分問題の解を得るためのアルゴリズムは、特に指定されていない(何でもよい)
+		\item 問題を解くうえで、他のノードと通信する必要がない(通信コストを十分に小さくできる)
+		\newline
+		
+		\item 各ノードが、摂動を加えた最適化問題を解くアルゴリズムの1つ \\
+		$\Leftarrow$ $\bm{a}_k^t$を、$\bm{a}_k^t = \nabla F_k(\bm{w}^t) - \eta \nabla f(\bm{w}^t)$と定義している \\
+		$\Leftarrow$ $\bm{w}^t \to \bm{w}^*$ならば$\nabla f(\bm{w}^t) \to \nabla f(\bm{w}^*) = 0$であるので、$\bm{a}_k^t \to \nabla F_k(\bm{w}^*)$が成立
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item DANE; Distributed Approximate Newton
+	\begin{itemize}
+		\item このアルゴリズムは、Federated Learningのために必要な条件(\ref{enum:fl-algorithm-feature-b})と(\ref{enum:fl-algorithm-feature-c})を満たさない
+		\item $\mu = 0, \eta = 1$ならば、条件(\ref{enum:fl-algorithm-feature-d})を満たす
+		\item 任意の$\mu, \eta$について、条件(\ref{enum:fl-algorithm-feature-a})を満たす
+		\newline
+		
+		\item このアルゴリズムでは、関数が2回微分可能であること、各ノードが独立同分布な標本を得られることを仮定
+		\newline
+		
+		\item 正則化パラメータ$\mu$の決め方については、改善の余地がある \\
+		$\Leftarrow$ $\mu = 0$であれば、ノード数$K$が小さいときは速やかに収束するが、$K$が増えるにつれて、急速に発散しやすくなる \\
+		$\Leftarrow$ $\mu$を大きくすれば、アルゴリズムは安定する(発散しづらくなる)が、その分パラメータの収束は遅くなる
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item DANEとSVRGを融合したアルゴリズム
+	\begin{itemize}
+		\item DANEアルゴリズムは、Federated Learningに適用できない(必要な条件を満たさない)
+		\item 部分問題の最適解を得る必要がある \\
+		$\Leftarrow$ 簡単な問題なら可能だが、複雑な問題であれば計算コストが掛かり過ぎる \\
+		$\Rightarrow$ 完全な最適解を得るのではなく、近似解を得るようなアルゴリズムに置き換える \\
+		$\Rightarrow$ 部分問題を解くアルゴリズムとして、先程の\alert{SVRG}を使用
+		\newline
+		
+		\item SVRGアルゴリズムでは、外側のループの最初で、完全な勾配$\nabla f(\bm{w}^t)$を計算する必要があった(2行目)
+		\item 完全な勾配$\nabla f(\bm{w}^t)$は、各ノードが部分問題を解く前の段階で、既に求まっている(3行目) \\
+		$\Rightarrow$ 各ノードでは、SVRGアルゴリズムの内側のループのみが実行され(後述)、完全な勾配を求める必要はない(既知である)
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{SVRG; Stochastic Variance Reduced Gradient (Recall) ~\cite{stochastic_2017}}
+	\label{alg:svrg-recall-2}
+	\Parameter{$m = $ number of stochastic steps per epoch, $h = $ stepsize (learning rate)}
+	\begin{algorithmic}[1]
+		\FOR{$s = 0, 1, \ldots$}
+			\STATE{Compute and store full gradient $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$} \tcp*{Full pass through data}
+			\STATE{Set $\bm{w} = \bm{w}^t$}
+			\FOR{$t = 1$ \TO $m$}
+				\STATE{Pick $i \in \left\{ 1, \ldots, N \right\}$, uniformly at random}
+				\STATE{Update using $\bm{w} = \bm{w} - h \left[ \nabla f_i(\bm{w}) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$} \tcp*{Stochastic update}
+			\ENDFOR
+			\STATE{$\bm{w}^{t + 1} = \bm{w}$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{DANE; Distributed Approximate Newton (Recall) ~\cite{1610.02527}}
+	\label{alg:dane-recall}
+	\Input{regularizer $\mu \ge 0$, parameter $\eta$ (default: $\mu = 0, \eta = 1$)}
+	\begin{algorithmic}[1]
+		\STATE{Initialize $\bm{w}^0$}
+		\FOR{$t = 0, 1, \ldots$}
+			\STATE{Compute $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$}
+			\STATE{Distribute $\nabla f(\bm{w}^t)$ to all machines}
+			\STATE{For each node $k \in \left\{ 1, \ldots, K \right\}$, solve
+			\begin{eqnarray}
+				&& \bm{w}_k^{t + 1} = \argmin_{\bm{w} \in \mathbb{R}^D} \bigg( F_k(\bm{w}) - \left( \nabla F_k(\bm{w}^t) - \eta \nabla f(\bm{w}^t) \right)^T \bm{w} \nonumber \\
+				&& \qquad \qquad \qquad + \frac{\mu}{2} || \bm{w} - \bm{w}^t ||^2 \bigg)
+			\end{eqnarray}}
+			\STATE{Compute $\bm{w}^{t + 1} = \frac{1}{K} \sum_{k = 1}^K \bm{w}_k^{t + 1}$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{itemize}
+	\item DANEとSVRGとの関係性
+	\begin{itemize}
+		\item DANEアルゴリズムは、ある特定の条件下では、分散化されたバージョンのSVRGアルゴリズムと等価
+		\newline
+		
+		\item 以下の2つのアルゴリズムは等価である
+		\item 従って、下記の2つのアルゴリズムは、同一のパラメータ列$\left\{ \bm{w}^t \right\}$を出力する
+	\end{itemize}
+	
+	\begin{enumerate}
+		\item $\mu = 0, \eta = 1$の下でDANEを実行し、その部分問題はSVRGアルゴリズムで解く
+		\item 分散化されたバージョンのSVRGアルゴリズムを解く(後述)
+	\end{enumerate}
+	
+	\begin{itemize}
+		\item 分散化されたSVRGアルゴリズムを次に示す
+	\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Federated Learningのための最適化アルゴリズム}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Naive Federated SVRG (FSVRG) ~\cite{1610.02527}}
+	\label{alg:naive-federated-svrg}
+	\Parameter{$m = $number of stochastic steps per epoch, $h = $stepsize, data partition $\left\{ \mathcal{P}_k \right\}_{k = 1}^K$} 
+	\begin{algorithmic}[1]
+		\STATE{Initialize $\bm{w}^0$}
+		\FOR{$t = 0, 1, \ldots, $}
+			\STATE{Compute $\nabla f(\bm{w}^t) = \frac{1}{N} \sum_{i = 1}^N \nabla f_i(\bm{w}^t)$, distribute to all machines}
+			\FOR{$k = 1$ to $K$ \textbf{do in parallel} over nodes $k$}
+				\STATE{Initialize $\bm{w}_k = \bm{w}^t$}
+				\FOR{$s = 1$ to $m$}
+					\STATE{Sample $i \in \mathcal{P}_k$ uniformly at random}
+					\STATE{Update using $\bm{w}_k = \bm{w}_k - h \left[ \nabla f_i(\bm{w}_k) - \nabla f_i(\bm{w}^t) + \nabla f(\bm{w}^t) \right]$}
+				\ENDFOR
+			\ENDFOR
+			\STATE{Update using $\bm{w}^{t + 1} = \bm{w}^t + \frac{1}{K} \sum_{k = 1}^K \left( \bm{w}_k - \bm{w}^t \right)$}
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
 
 \end{frame}
 
